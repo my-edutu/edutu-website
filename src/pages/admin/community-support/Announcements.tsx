@@ -1,6 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+import { addDoc, collection, getDocs, serverTimestamp, Timestamp } from '../../../lib/firebaseMock';
 import AnnouncementForm, {
   AnnouncementFormValues,
   AnnouncementAudience

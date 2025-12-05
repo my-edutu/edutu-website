@@ -92,7 +92,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     setIsLoading(true);
 
     try {
-      await authService.signInWithGoogle(window.location.origin);
+      // Use the full URL including the port for more specific redirect
+      await authService.signInWithGoogle(`${window.location.origin}${window.location.pathname}`);
     } catch (error) {
       setErrorMessage(getMessageFromError(error));
       setStatusMessage(null);

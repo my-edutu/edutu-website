@@ -7,6 +7,7 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { authService, type Profile } from '../lib/auth';
 import type { AppUser } from '../types/user';
+import type { OnboardingProfileData } from '../types/onboarding';
 
 interface EditProfileScreenProps {
   user: AppUser | null;
@@ -21,8 +22,12 @@ type ProfileFormData = {
   phone: string;
   location: string;
   bio: string;
+  courseOfStudy: string;
   interests: string;
   goals: string;
+  experience: string;
+  educationLevel: string;
+  preferredLearning: string;
 };
 
 const DEFAULT_FORM: ProfileFormData = {
@@ -32,8 +37,12 @@ const DEFAULT_FORM: ProfileFormData = {
   phone: '+234 123 456 7890',
   location: 'Lagos, Nigeria',
   bio: 'Passionate about technology and personal growth. Always looking for new opportunities to learn and make an impact.',
+  courseOfStudy: '',
   interests: 'Technology, Entrepreneurship, Education',
-  goals: 'Complete Python Course, Apply to Scholarships, Build Portfolio'
+  goals: 'Complete Python Course, Apply to Scholarships, Build Portfolio',
+  experience: 'intermediate',
+  educationLevel: 'undergraduate',
+  preferredLearning: 'visual, hands-on'
 };
 
 const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, onBack }) => {
@@ -48,13 +57,51 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        name: user.name,
-        age: user.age !== undefined ? user.age.toString() : ''
-      }));
-    }
+    const loadProfileData = async () => {
+      if (user) {
+        // Load basic user info
+        setFormData((prev) => ({
+          ...prev,
+          name: user.name,
+          age: user.age !== undefined ? user.age.toString() : '',
+          courseOfStudy: user.courseOfStudy || ''
+        }));
+
+        // Load more detailed profile data from the database
+        try {
+          const profile = await authService.getProfile(user.id);
+          if (profile) {
+            // Update form with profile data if it exists
+            setFormData((prev) => ({
+              ...prev,
+              email: profile.email || prev.email,
+              bio: profile.bio || prev.bio,
+              location: profile.preferences?.location || prev.location,
+              courseOfStudy: profile.preferences?.course_of_study || user.courseOfStudy || prev.courseOfStudy,
+            }));
+
+            // Load onboarding data if it exists
+            const onboarding = profile.preferences?.onboarding as OnboardingProfileData | undefined;
+            if (onboarding) {
+              setFormData((prev) => ({
+                ...prev,
+                courseOfStudy: onboarding.courseOfStudy,
+                interests: onboarding.interests.join(', '),
+                goals: onboarding.goals.join(', '),
+                experience: onboarding.experience,
+                educationLevel: onboarding.educationLevel,
+                preferredLearning: onboarding.preferredLearning.join(', '),
+                location: onboarding.location
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load profile data:', error);
+        }
+      }
+    };
+
+    loadProfileData();
   }, [user, setFormData]);
 
   const scrollToTop = () => {
@@ -124,26 +171,73 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
         name: formData.name,
         full_name: formData.name,
         age: parsedAge,
+        course_of_study: formData.courseOfStudy
       });
 
       // Update user in the profiles table
-      const user = await authService.getCurrentUser();
-      if (user) {
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser) {
+        // Get existing profile to preserve other data
+        let profile = await authService.getProfile(currentUser.id);
+
+        // Build updated preferences that include onboarding data
+        const onboardingData = {
+          fullName: formData.name,
+          age: parsedAge,
+          courseOfStudy: formData.courseOfStudy,
+          interests: formData.interests.split(',').map(i => i.trim()).filter(i => i),
+          goals: formData.goals.split(',').map(g => g.trim()).filter(g => g),
+          experience: formData.experience,
+          location: formData.location,
+          educationLevel: formData.educationLevel,
+          preferredLearning: formData.preferredLearning.split(',').map(l => l.trim()).filter(l => l)
+        };
+
+        // If we already have onboarding data in the profile, merge it appropriately
+        let preferences = profile?.preferences || {};
+
+        // Update onboarding data if profile exists
+        if (preferences.onboarding) {
+          preferences = {
+            ...preferences,
+            onboarding: {
+              ...preferences.onboarding,
+              ...onboardingData,
+              // Ensure completion flag is maintained
+              completed: (preferences.onboarding as any).completed || false
+            }
+          };
+        } else {
+          // For new profiles, create onboarding object
+          preferences = {
+            ...preferences,
+            onboarding: {
+              ...onboardingData,
+              completed: true, // Mark as completed since user edited it
+              completedAt: new Date().toISOString()
+            }
+          };
+        }
+
         const profileData: Profile = {
-          user_id: user.id,
+          user_id: currentUser.id,
           name: formData.name,
           full_name: formData.name,
           age: parsedAge,
           email: formData.email,
           bio: formData.bio,
-          preferences: {},
+          preferences,
           updated_at: new Date().toISOString(),
         };
 
         await authService.upsertProfile(profileData);
-        
+
         // Update the user in the app state
-        const nextUser: AppUser = { ...user, name: formData.name };
+        const nextUser: AppUser = {
+          ...currentUser,
+          name: formData.name,
+          courseOfStudy: formData.courseOfStudy
+        };
         if (Number.isFinite(parsedAge)) {
           nextUser.age = parsedAge;
         } else {
@@ -305,6 +399,21 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
                 />
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Course of Study
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.courseOfStudy}
+                  onChange={handleFieldChange('courseOfStudy')}
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  placeholder="e.g., Computer Science"
+                />
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -347,6 +456,52 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none"
                 placeholder="What are your current goals?"
                 rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Education Level
+              </label>
+              <select
+                value={formData.educationLevel}
+                onChange={handleFieldChange('educationLevel')}
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="high-school">High School</option>
+                <option value="undergraduate">Undergraduate</option>
+                <option value="graduate">Graduate</option>
+                <option value="postgraduate">Postgraduate</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Experience Level
+              </label>
+              <select
+                value={formData.experience}
+                onChange={handleFieldChange('experience')}
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="beginner">Beginner (Just starting out)</option>
+                <option value="intermediate">Intermediate (Some experience)</option>
+                <option value="advanced">Advanced (Experienced)</option>
+                <option value="expert">Expert (Highly experienced)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Preferred Learning Styles
+              </label>
+              <input
+                type="text"
+                value={formData.preferredLearning}
+                onChange={handleFieldChange('preferredLearning')}
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                placeholder="Your preferred learning styles (comma separated)"
               />
             </div>
           </div>

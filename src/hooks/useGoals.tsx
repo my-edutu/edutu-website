@@ -1,4 +1,5 @@
-import React, {
+import React,
+{
   createContext,
   useCallback,
   useContext,
@@ -9,6 +10,7 @@ import React, {
 } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { syncUserGoalSummary } from '../services/analyticsAggregator';
+import { taskTrackingService } from '../services/taskTrackingService';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 export type GoalStatus = 'active' | 'completed' | 'archived';
@@ -287,12 +289,12 @@ export const GoalsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw error;
     }
 
-    dispatch({ 
-      type: 'UPDATE_GOAL', 
-      payload: { 
-        id, 
-        updates: { ...updates, updated_at: new Date().toISOString() } 
-      } 
+    dispatch({
+      type: 'UPDATE_GOAL',
+      payload: {
+        id,
+        updates: { ...updates, updated_at: new Date().toISOString() }
+      }
     });
     const updatedAt = new Date().toISOString();
     const nextGoals = state.goals.map((goal) => {
@@ -307,6 +309,16 @@ export const GoalsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         nextCompletedAt = updates.completed_at as string | null;
       } else if (nextStatus === 'completed' && !goal.completed_at) {
         nextCompletedAt = updatedAt;
+        // Track this as a completed task
+        taskTrackingService.addCompletedTask({
+          id: `goal-${id}`,
+          title: `Completed goal: ${goal.title}`,
+          source: 'goal',
+          metadata: {
+            goalId: goal.id,
+            goalTitle: goal.title
+          }
+        });
       } else if (nextStatus !== 'completed') {
         nextCompletedAt = null;
       }

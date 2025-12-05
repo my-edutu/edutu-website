@@ -44,6 +44,7 @@ edutu app/
 - **AI Chat**: `ChatInterface.tsx` throws until a backend proxy handles OpenRouter calls. A prototype exists at `src/pages/api/chat.js`.
 - **Server Persistence**: All stateful experiences rely on browser storage, no Firestore or REST APIs yet.
 - **Community and Support Integrations**: Marketplace data, support responses, and announcements are static fixtures.
+- **n8n Integration**: Basic webhook service exists (`src/services/n8nIntegration.ts`) but requires backend endpoint implementation for production.
 
 ## Data Model Overview
 - `usePersistentState` wraps `localStorage` for reusable statefulness.

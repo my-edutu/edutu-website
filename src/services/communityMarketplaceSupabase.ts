@@ -1,4 +1,5 @@
-// Mock service to replace Firebase community marketplace functionality
+// Mock service to replace Firebase functionality with Supabase
+import { supabase } from '../lib/supabaseClient';
 import type {
   CommunityModeratorNote,
   CommunityResource,
@@ -11,8 +12,6 @@ import type {
   CommunityStoryType,
   CommunityStoryUpdateInput
 } from '../types/community';
-
-const COLLECTION_NAME = 'community_marketplace';
 
 // Mock data for demonstration purposes
 const mockStories: CommunityStory[] = [
@@ -104,7 +103,7 @@ const mockStories: CommunityStory[] = [
   }
 ];
 
-// Mock implementation of all functions required by the original service
+// Mock implementation of all functions required by the Firebase service
 export function listenToCommunityStories(
   options: CommunityStoryQueryOptions,
   handlers: {
@@ -147,15 +146,15 @@ export async function getCommunityStory(id: string): Promise<CommunityStory | nu
 }
 
 export async function submitCommunityStory(input: CommunityStorySubmissionInput) {
-  // Using mock implementation for now
-  console.log('Submitting story (using mock implementation):', input);
+  // TODO: Implement actual submission to Supabase when schema is ready
+  console.log('Submitting story:', input);
   // For now, just return a mock ID
   return { id: `mock-${Date.now()}` };
 }
 
 export async function updateCommunityStory(id: string, updates: CommunityStoryUpdateInput) {
-  // Using mock implementation for now
-  console.log('Updating story (using mock implementation):', id, updates);
+  // TODO: Implement actual update to Supabase when schema is ready
+  console.log('Updating story:', id, updates);
   return { id };
 }
 
@@ -164,8 +163,8 @@ export async function setCommunityStoryStatus(
   status: CommunityStoryStatus,
   metadata?: { approvedBy?: string }
 ) {
-  // Using mock implementation for now
-  console.log('Updating status (using mock implementation):', id, status, metadata);
+  // TODO: Implement actual status update to Supabase when schema is ready
+  console.log('Updating status:', id, status, metadata);
   return { id };
 }
 
@@ -174,26 +173,26 @@ export async function setCommunityStoryFeatured(
   featured: boolean,
   featuredRank?: number | null
 ) {
-  // Using mock implementation for now
-  console.log('Setting featured (using mock implementation):', id, featured, featuredRank);
+  // TODO: Implement actual featured update to Supabase when schema is ready
+  console.log('Setting featured:', id, featured, featuredRank);
   return { id };
 }
 
 export async function recordCommunityStoryAdoption(id: string) {
-  // Using mock implementation for now
-  console.log('Recording adoption for story (using mock implementation):', id);
+  // TODO: Implement actual adoption recording to Supabase when schema is ready
+  console.log('Recording adoption for story:', id);
   return { id };
 }
 
 export async function recordCommunityStoryLike(id: string) {
-  // Using mock implementation for now
-  console.log('Recording like for story (using mock implementation):', id);
+  // TODO: Implement actual like recording to Supabase when schema is ready
+  console.log('Recording like for story:', id);
   return { id };
 }
 
 export async function recordCommunityStorySave(id: string) {
-  // Using mock implementation for now
-  console.log('Recording save for story (using mock implementation):', id);
+  // TODO: Implement actual save recording to Supabase when schema is ready
+  console.log('Recording save for story:', id);
   return { id };
 }
 
@@ -201,7 +200,7 @@ export async function appendModeratorNote(
   id: string,
   entry: { note: string; author?: string }
 ) {
-  // Using mock implementation for now
-  console.log('Appending moderator note for story (using mock implementation):', id, entry);
+  // TODO: Implement actual note appending to Supabase when schema is ready
+  console.log('Appending moderator note for story:', id, entry);
   return { id };
 }

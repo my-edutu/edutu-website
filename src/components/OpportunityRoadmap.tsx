@@ -275,6 +275,40 @@ const OpportunityRoadmap: React.FC<OpportunityRoadmapProps> = ({
           : month
       )
     );
+
+    // Find the task that was toggled to determine its previous state
+    const previousMonth = roadmapData.find(m => m.id === monthId);
+    if (previousMonth) {
+      const previousWeek = previousMonth.weeks.find(w => w.id === weekId);
+      if (previousWeek) {
+        const previousTask = previousWeek.tasks.find(t => t.id === taskId);
+        if (previousTask) {
+          // Check if the task is now completed (after the toggle)
+          const isNowCompleted = !previousTask.completed;
+          if (isNowCompleted) {
+            // Task was just marked as completed
+            import('../services/taskTrackingService').then(module => {
+              module.taskTrackingService.addCompletedTask({
+                id: `roadmap-task-${taskId}`,
+                title: previousTask.title,
+                source: 'opportunity-roadmap',
+                metadata: {
+                  opportunityId: opportunity.id,
+                  opportunityTitle: opportunity.title,
+                  monthId,
+                  weekId
+                }
+              });
+            });
+          } else {
+            // Task was uncompleted, remove from tracking
+            import('../services/taskTrackingService').then(module => {
+              module.taskTrackingService.removeCompletedTask(`roadmap-task-${taskId}`);
+            });
+          }
+        }
+      }
+    }
   };
 
   const calculateProgress = () => {

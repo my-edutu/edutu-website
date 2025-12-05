@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, serverTimestamp, setDoc, doc } from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+import { collection, getDocs, serverTimestamp, setDoc, doc } from '../../../lib/firebaseMock';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 import { useToast } from '../../ui/ToastProvider';

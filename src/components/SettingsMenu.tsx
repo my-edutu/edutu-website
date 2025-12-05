@@ -1,17 +1,20 @@
 import React from 'react';
-import { ArrowLeft, User, Bell, Shield, HelpCircle, Info, LogOut, Settings, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, User, Bell, Shield, HelpCircle, Info, LogOut, Settings, Moon, Sun, RefreshCw } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { Screen } from '../App';
+import type { OnboardingProfileData } from '../types/onboarding';
 
 interface SettingsMenuProps {
   onBack: () => void;
   onNavigate: (screen: Screen) => void;
   onLogout: () => void;
+  onRedoOnboarding?: () => void;
+  onboardingProfile?: OnboardingProfileData | null;
 }
 
-const SettingsMenu: React.FC<SettingsMenuProps> = ({ onBack, onNavigate, onLogout }) => {
+const SettingsMenu: React.FC<SettingsMenuProps> = ({ onBack, onNavigate, onLogout, onRedoOnboarding, onboardingProfile }) => {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   const settingsOptions = [
@@ -63,6 +66,18 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onBack, onNavigate, onLogou
     scrollToTop();
     onLogout();
   };
+
+  const handleRedoOnboarding = () => {
+    if (!onRedoOnboarding) {
+      return;
+    }
+    scrollToTop();
+    onRedoOnboarding();
+  };
+
+  const topGoals = onboardingProfile?.goals?.slice(0, 3) ?? [];
+  const topInterests = onboardingProfile?.interests?.slice(0, 3) ?? [];
+  const hasProfileSnapshot = Boolean(onboardingProfile);
 
   return (
     <div className={`min-h-screen bg-white dark:bg-gray-900 animate-fade-in ${isDarkMode ? 'dark' : ''}`}>
@@ -144,6 +159,67 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onBack, onNavigate, onLogou
             </div>
           </Card>
         ))}
+
+        {onRedoOnboarding && (
+          <Card
+            className="cursor-pointer transition-all transform hover:scale-[1.02] hover:bg-indigo-50/60 dark:hover:bg-indigo-900/20 dark:bg-gray-800 dark:border-gray-700 animate-slide-up"
+            style={{ animationDelay: '450ms' }}
+            onClick={handleRedoOnboarding}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center">
+                <RefreshCw size={20} className="text-indigo-600 dark:text-indigo-300" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800 dark:text-white mb-1">Personalization profile</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {hasProfileSnapshot
+                    ? `Tailored for ${onboardingProfile?.courseOfStudy || 'your current path'}. Refresh your answers anytime to keep recommendations aligned with you.`
+                    : 'Share your goals, interests, and learning style so Edutu can tailor opportunities and roadmaps to you.'}
+                </p>
+                {hasProfileSnapshot && (
+                  <div className="mt-3 space-y-2">
+                    {topGoals.length > 0 && (
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Top goals</div>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {topGoals.map((goal) => (
+                            <span
+                              key={goal}
+                              className="inline-flex items-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-200"
+                            >
+                              {goal}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {topInterests.length > 0 && (
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Top interests</div>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {topInterests.map((interest) => (
+                            <span
+                              key={interest}
+                              className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+                            >
+                              {interest}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="mt-1 text-gray-400 dark:text-gray-500">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Sign Out */}
         <Card 

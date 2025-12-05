@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, serverTimestamp, setDoc, doc } from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+import { collection, getDocs, serverTimestamp, setDoc, doc } from '../../../lib/firebaseMock';
 import Card from '../../ui/Card';
 import Textarea from '../../ui/Textarea';
 import Select from '../../ui/Select';

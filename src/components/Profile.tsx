@@ -18,6 +18,7 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import CVManagement from './CVManagement';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useNotifications } from '../hooks/useNotifications';
 import type { AppUser } from '../types/user';
 
 interface ProfileProps {
@@ -58,7 +59,7 @@ const Profile: React.FC<ProfileProps> = ({ user, setUser, onNavigate, onLogout }
   const [bio, setBio] = useState(storedProfile.bio || PROFILE_STORAGE_DEFAULT.bio);
   const [showCVManagement, setShowCVManagement] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount] = useState(3); // This would come from your notification state
+  const { unreadCount } = useNotifications();
   const { isDarkMode } = useDarkMode();
   const { stats: analyticsStats } = useAnalytics();
 

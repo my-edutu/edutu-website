@@ -1,34 +1,64 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { X, ChevronRight, ChevronLeft, Sparkles, Target, BookOpen, Briefcase, Heart, Globe } from 'lucide-react';
 import Button from './ui/Button';
-import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
+import type { OnboardingProfileData } from '../types/onboarding';
 
 interface IntroductionPopupProps {
   isOpen: boolean;
-  onComplete: (userData: any) => void;
+  onComplete: (userData: OnboardingProfileData | null) => void | Promise<void>;
   userName: string;
+  initialData?: OnboardingProfileData | null;
 }
 
-const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplete, userName }) => {
+interface IntroductionFormData {
+  fullName: string;
+  age: string;
+  courseOfStudy: string;
+  interests: string[];
+  goals: string[];
+  experience: string;
+  location: string;
+  education: string;
+  preferredLearning: string[];
+}
+
+const createInitialFormData = (data: OnboardingProfileData | null | undefined, fallbackName: string): IntroductionFormData => ({
+  fullName: data?.fullName ?? fallbackName,
+  age: data?.age !== null && data?.age !== undefined ? String(data.age) : '',
+  courseOfStudy: data?.courseOfStudy ?? '',
+  interests: [...(data?.interests ?? [])],
+  goals: [...(data?.goals ?? [])],
+  experience: data?.experience ?? '',
+  location: data?.location ?? '',
+  education: data?.educationLevel ?? '',
+  preferredLearning: [...(data?.preferredLearning ?? [])]
+});
+
+const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplete, userName, initialData }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({
-    interests: [] as string[],
-    goals: [] as string[],
-    experience: '',
-    location: '',
-    education: '',
-    skills: [] as string[],
-    timeCommitment: '',
-    preferredLearning: [] as string[]
-  });
+  const [formData, setFormData] = useState<IntroductionFormData>(() => createInitialFormData(initialData, userName));
   const { isDarkMode } = useDarkMode();
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    setFormData(createInitialFormData(initialData, userName));
+    setCurrentStep(0);
+  }, [initialData, isOpen, userName]);
 
   const steps = [
     {
-      title: "Welcome to Edutu! 👋",
+      title: "Welcome to Edutu!",
       subtitle: `Hi ${userName}! I'm your AI opportunity coach`,
       content: "welcome"
+    },
+    {
+      title: "Let's get to know you",
+      subtitle: "Share a few essentials so we can tailor your experience",
+      content: "basics"
     },
     {
       title: "What interests you most?",
@@ -51,7 +81,7 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
       content: "learning"
     },
     {
-      title: "Perfect! Let's get started 🚀",
+      title: "Perfect! Let's get started",
       subtitle: "I'm analyzing your profile to find the best opportunities for you",
       content: "completion"
     }
@@ -97,12 +127,36 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
     }));
   };
 
+  const handleFieldChange =
+    (field: keyof IntroductionFormData) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { value } = event.target;
+      setFormData((previous) => ({
+        ...previous,
+        [field]: value
+      }));
+    };
+
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onComplete(formData);
+      setCurrentStep((previous) => previous + 1);
+      return;
     }
+
+    const parsedAge = Number.parseInt(formData.age.trim(), 10);
+    const sanitizedData: OnboardingProfileData = {
+      fullName: formData.fullName.trim(),
+      age: Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : null,
+      courseOfStudy: formData.courseOfStudy.trim(),
+      interests: [...formData.interests],
+      goals: [...formData.goals],
+      educationLevel: formData.education.trim(),
+      location: formData.location.trim(),
+      experience: formData.experience.trim(),
+      preferredLearning: [...formData.preferredLearning]
+    };
+
+    onComplete(sanitizedData);
   };
 
   const handlePrevious = () => {
@@ -112,14 +166,31 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
   };
 
   const canProceed = () => {
-    switch (currentStep) {
-      case 0: return true;
-      case 1: return formData.interests.length > 0;
-      case 2: return formData.goals.length > 0;
-      case 3: return formData.experience && formData.location && formData.education;
-      case 4: return formData.preferredLearning.length > 0;
-      case 5: return true;
-      default: return false;
+    const currentContent = steps[currentStep]?.content;
+    switch (currentContent) {
+      case 'welcome':
+        return true;
+      case 'basics': {
+        const ageValue = Number.parseInt(formData.age.trim(), 10);
+        return (
+          Boolean(formData.fullName.trim()) &&
+          Boolean(formData.courseOfStudy.trim()) &&
+          Number.isFinite(ageValue) &&
+          ageValue > 0
+        );
+      }
+      case 'interests':
+        return formData.interests.length > 0;
+      case 'goals':
+        return formData.goals.length > 0;
+      case 'background':
+        return Boolean(formData.experience.trim() && formData.location.trim() && formData.education.trim());
+      case 'learning':
+        return formData.preferredLearning.length > 0;
+      case 'completion':
+        return true;
+      default:
+        return false;
     }
   };
 
@@ -129,11 +200,11 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
     const step = steps[currentStep];
 
     switch (step.content) {
-      case 'welcome':
-        return (
-          <div className="text-center py-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-subtle">
-              <Sparkles size={40} className="text-white" />
+        case 'welcome':
+          return (
+            <div className="text-center py-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-subtle">
+                <Sparkles size={40} className="text-white" />
             </div>
             <p className="text-lg text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
               I'm here to help you discover amazing opportunities and create personalized roadmaps to achieve your goals. 
@@ -156,9 +227,55 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
                 <Heart size={16} className="text-red-500" />
                 <span>Ongoing support</span>
               </div>
+              </div>
             </div>
-          </div>
-        );
+          );
+
+        case 'basics':
+          return (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Full name
+                </label>
+                <input
+                  type="text"
+                  value={formData.fullName}
+                  onChange={handleFieldChange('fullName')}
+                  placeholder="Enter your full name"
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="80"
+                    value={formData.age}
+                    onChange={handleFieldChange('age')}
+                    placeholder="How old are you?"
+                    className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Course of study
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.courseOfStudy}
+                    onChange={handleFieldChange('courseOfStudy')}
+                    placeholder="e.g., Computer Science"
+                    className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+          );
 
       case 'interests':
         return (
@@ -213,7 +330,7 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
               </label>
               <select
                 value={formData.education}
-                onChange={(e) => setFormData({ ...formData, education: e.target.value })}
+                onChange={handleFieldChange('education')}
                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="">Select your education level</option>
@@ -225,18 +342,18 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Location (Country/City)
-              </label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="e.g., Lagos, Nigeria"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Location (Country/City)
+                </label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={handleFieldChange('location')}
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="e.g., Lagos, Nigeria"
+                />
+              </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -244,7 +361,7 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
               </label>
               <select
                 value={formData.experience}
-                onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                onChange={handleFieldChange('experience')}
                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="">Select your experience level</option>
@@ -294,7 +411,7 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
             </p>
             <div className="bg-gradient-to-r from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 p-4 rounded-2xl">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                🎯 <strong>Ready to explore:</strong> {formData.interests.length} interest areas, {formData.goals.length} goals, and personalized learning paths
+                <strong>Ready to explore:</strong> {formData.interests.length} interest areas, {formData.goals.length} goals, and personalized learning paths
               </p>
             </div>
           </div>
@@ -315,9 +432,15 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
               <h2 className="text-xl font-bold text-gray-800 dark:text-white">{steps[currentStep].title}</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{steps[currentStep].subtitle}</p>
             </div>
-            {currentStep === 0 && (
+            {/* Remove close button for new users to make it compulsory, keep for existing users */}
+            {currentStep === 0 && initialData === null && (
+              <div className="p-2 rounded-full">
+                <X size={20} className="text-transparent" /> {/* Invisible placeholder for alignment */}
+              </div>
+            )}
+            {currentStep === 0 && initialData !== null && (
               <button
-                onClick={() => onComplete({})}
+                onClick={() => onComplete(null)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
               >
                 <X size={20} className="text-gray-500" />
@@ -373,3 +496,7 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
 };
 
 export default IntroductionPopup;
+
+
+
+

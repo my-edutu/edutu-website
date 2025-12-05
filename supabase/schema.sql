@@ -1323,6 +1323,83 @@ create policy "Service role manages feature flags"
   with check (auth.role() = 'service_role');
 
 -- ------------------------------------------------------------------
+-- Notifications
+-- ------------------------------------------------------------------
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  kind text not null check (kind in ('goal-reminder','goal-weekly-digest','goal-progress','opportunity-highlight','admin-broadcast','system')),
+  title text not null,
+  body text not null,
+  severity text not null default 'info' check (severity in ('info','success','warning','critical')),
+  metadata jsonb not null default '{}'::jsonb,
+  dedupe_key text,
+  channel_status jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+
+create index if not exists notifications_user_created_idx on public.notifications (user_id, created_at desc);
+
+alter table public.notifications enable row level security;
+
+create policy "Users read own notifications"
+  on public.notifications
+  for select
+  using (auth.uid() = user_id);
+
+create policy "Users update own notifications"
+  on public.notifications
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table if not exists public.notification_preferences (
+  user_id uuid primary key references auth.users on delete cascade,
+  push_notifications boolean not null default true,
+  email_notifications boolean not null default false,
+  opportunity_alerts boolean not null default true,
+  deadline_reminders boolean not null default true,
+  goal_reminders boolean not null default true,
+  achievement_celebrations boolean not null default true,
+  weekly_digest boolean not null default false,
+  marketing_emails boolean not null default false,
+  quiet_hours jsonb not null default jsonb_build_object('start','22:00','end','08:00'),
+  updated_at timestamptz not null default now()
+);
+
+create trigger set_timestamp_notification_preferences
+before update on public.notification_preferences
+for each row execute function public.set_updated_at();
+
+alter table public.notification_preferences enable row level security;
+
+create policy "Users manage own notification preferences"
+  on public.notification_preferences
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table if not exists public.notification_push_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  provider text not null default 'fcm',
+  token text not null,
+  device jsonb not null default '{}'::jsonb,
+  last_seen_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (user_id, token)
+);
+
+create index if not exists notification_push_tokens_user_idx on public.notification_push_tokens (user_id);
+
+alter table public.notification_push_tokens enable row level security;
+
+create policy "Users manage own push tokens"
+  on public.notification_push_tokens
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ------------------------------------------------------------------
 -- Audit log for admin insights
 -- ------------------------------------------------------------------
 create table if not exists public.audit_log (

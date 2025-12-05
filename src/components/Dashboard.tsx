@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+﻿import React, { useMemo, useState, useEffect } from 'react';
 import {
   Award,
   Bell,
@@ -14,7 +14,8 @@ import {
   Upload,
   Users,
   FileText,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
@@ -22,7 +23,10 @@ import NotificationInbox from './NotificationInbox';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoals } from '../hooks/useGoals';
 import { useOpportunities } from '../hooks/useOpportunities';
+import { usePersonalizedOpportunities } from '../hooks/usePersonalizedOpportunities';
+import { taskTrackingService } from '../services/taskTrackingService';
 import type { AppUser } from '../types/user';
+import type { OnboardingProfileData } from '../types/onboarding';
 
 interface DashboardProps {
   user: AppUser | null;
@@ -32,6 +36,8 @@ interface DashboardProps {
   onNavigate?: (screen: string) => void;
   onAddGoal?: () => void;
   onViewAllGoals?: () => void;
+  onboardingProfile?: OnboardingProfileData | null;
+  onRedoOnboarding?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -41,7 +47,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   onGoalClick,
   onNavigate,
   onAddGoal,
-  onViewAllGoals
+  onViewAllGoals,
+  onboardingProfile,
+  onRedoOnboarding
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount] = useState(3);
@@ -118,13 +126,49 @@ const Dashboard: React.FC<DashboardProps> = ({
     data: opportunityFeed,
     loading: opportunitiesLoading,
     error: opportunitiesError,
-    refresh: refreshOpportunities
-  } = useOpportunities();
+    refresh: refreshOpportunities,
+    setUserProfile: setOpportunityUserProfile
+  } = onboardingProfile
+    ? usePersonalizedOpportunities()
+    : { ...useOpportunities(), setUserProfile: undefined };
 
-  const featuredOpportunities = useMemo(
-    () => opportunityFeed.slice(0, 3),
-    [opportunityFeed]
-  );
+  const featuredOpportunities = useMemo(() => {
+    // Use personalized opportunities if available, otherwise regular opportunities
+    if (onboardingProfile && Array.isArray(opportunityFeed)) {
+      // If opportunityFeed contains match scores, return opportunities with match scores
+      return opportunityFeed.map(item => {
+        if ('opportunity' in item && 'matchScore' in item) {
+          // Return the opportunity with the match score attached
+          return {
+            ...item.opportunity,
+            matchScore: item.matchScore
+          };
+        }
+        // For regular opportunities, return as is
+        return item;
+      }).slice(0, 3);
+    }
+
+    // For non-personalized feed, return the data directly
+    return (opportunityFeed as any[]).slice(0, 3);
+  }, [opportunityFeed, onboardingProfile]);
+
+  // Set user profile when onboarding data is available
+  useEffect(() => {
+    if (user && onboardingProfile && setOpportunityUserProfile) {
+      // Format onboarding data for recommendations
+      const userPreferences = {
+        interests: onboardingProfile.interests,
+        location: onboardingProfile.location,
+        careerGoals: onboardingProfile.goals,
+        experienceLevel: onboardingProfile.experience,
+        preferredCategories: [onboardingProfile.courseOfStudy],
+        availability: 'flexible'
+      };
+
+      setOpportunityUserProfile(user, undefined, userPreferences);
+    }
+  }, [user, onboardingProfile, setOpportunityUserProfile]);
 
   const formatDateShort = (deadline?: string) => {
     if (!deadline) {
@@ -276,31 +320,25 @@ const Dashboard: React.FC<DashboardProps> = ({
       type: 'goal_completed'
     }));
 
-  const fallbackWins = [
-    {
-      id: 'static-1',
-      title: 'Set up Python development environment',
+  const taskCompletionWins = taskTrackingService.getRecentCompletedTasks(5)
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
       icon: <CheckCircle2 size={16} />,
-      date: 'Today',
-      type: 'task_completed'
-    },
-    {
-      id: 'static-2',
-      title: 'Complete Python basics tutorial',
-      icon: <CheckCircle2 size={16} />,
-      date: 'Today',
-      type: 'task_completed'
-    },
-    {
-      id: 'static-3',
-      title: 'Profile Complete',
-      icon: <Award size={16} />,
-      date: 'Yesterday',
-      type: 'milestone'
-    }
-  ];
+      date: formatUpdatedAt(task.completedAt),
+      type: 'task_completed',
+      source: task.source
+    }));
 
-  const recentWins = goalCompletionWins.length > 0 ? goalCompletionWins : fallbackWins;
+  // Combine goal completions and task completions, then sort by date
+  const allRecentWins = [...goalCompletionWins, ...taskCompletionWins]
+    .sort((a, b) => {
+      // Sort by most recent first
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    })
+    .slice(0, 5); // Take only the 5 most recent wins
+
+  const recentWins = allRecentWins;
 
   const nextDeadlineGoal = useMemo(() => {
     const withDeadline = activeGoals.filter((goal) => goal.deadline);
@@ -345,7 +383,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         label: 'Next deadline',
         value: nextDeadlineGoal ? formatDateShort(nextDeadlineGoal.deadline) : 'No deadline',
         helper: nextDeadlineGoal
-          ? `${describeDueDate(nextDeadlineGoal.deadline)} � ${nextDeadlineGoal.title}`
+          ? `${describeDueDate(nextDeadlineGoal.deadline)} · ${nextDeadlineGoal.title}`
           : 'Add a deadline to stay on pace'
       }
     ],
@@ -873,7 +911,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                       <div className="flex flex-col items-end justify-center flex-shrink-0">
                         <div className="text-sm font-semibold text-success">
-                          {Math.round(opportunity.match ?? 0)}% match
+                          {Math.round(
+                            (opportunity as any).matchScore ??
+                            (opportunity as any).match ??
+                            0
+                          )}% match
                         </div>
                         <ChevronRight size={18} className="text-muted flex-shrink-0" />
                       </div>
@@ -934,5 +976,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 };
 
 export default Dashboard;
+
 
 

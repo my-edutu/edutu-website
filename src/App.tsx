@@ -19,14 +19,17 @@ import AddGoalScreen from './components/AddGoalScreen';
 import CommunityMarketplace from './components/CommunityMarketplace';
 import IntroductionPopup from './components/IntroductionPopup';
 import AllGoals from './components/AllGoals';
+import AchievementsScreen from './components/AchievementsScreen';
 import { useDarkMode } from './hooks/useDarkMode';
 import { Goal, useGoals } from './hooks/useGoals';
-import { authService, getProfileFromUser } from './lib/auth';
+import { authService, getProfileFromUser, isNewUser } from './lib/auth';
 import { useAnalytics } from './hooks/useAnalytics';
 import type { Opportunity } from './types/opportunity';
 import type { AppUser } from './types/user';
+import type { OnboardingProfileData, OnboardingState } from './types/onboarding';
+import { fetchUserProfile, hasCompletedOnboarding, saveOnboardingProfile, extractOnboardingState } from './services/profile';
 
-export type Screen = 'landing' | 'auth' | 'chat' | 'dashboard' | 'all-goals' | 'profile' | 'opportunity-detail' | 'all-opportunities' | 'roadmap' | 'opportunity-roadmap' | 'settings' | 'profile-edit' | 'notifications' | 'privacy' | 'help' | 'cv-management' | 'add-goal' | 'community-marketplace';
+export type Screen = 'landing' | 'auth' | 'chat' | 'dashboard' | 'all-goals' | 'profile' | 'opportunity-detail' | 'all-opportunities' | 'roadmap' | 'opportunity-roadmap' | 'settings' | 'profile-edit' | 'notifications' | 'privacy' | 'help' | 'cv-management' | 'add-goal' | 'community-marketplace' | 'achievements';
 
 export function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('landing');
@@ -34,6 +37,9 @@ export function App() {
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [showIntroPopup, setShowIntroPopup] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
+  const [hasDismissedOnboarding, setHasDismissedOnboarding] = useState(false);
+  const [manualOnboardingTrigger, setManualOnboardingTrigger] = useState(false);
   const { goals, createGoal } = useGoals();
   const { isDarkMode } = useDarkMode();
   const { recordOpportunityExplored } = useAnalytics();
@@ -75,6 +81,9 @@ export function App() {
       } else {
         setUser(null);
         setSelectedGoalId(null);
+        setOnboardingState(null);
+        setManualOnboardingTrigger(false);
+        setHasDismissedOnboarding(false);
         setShowIntroPopup(false);
         setCurrentScreen('landing');
       }
@@ -86,6 +95,77 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    setHasDismissedOnboarding(false);
+    setManualOnboardingTrigger(false);
+    setOnboardingState(null);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setShowIntroPopup(false);
+      setOnboardingState(null);
+      return;
+    }
+
+    let isActive = true;
+
+    const evaluateOnboarding = async () => {
+      try {
+        const profile = await fetchUserProfile(user.id);
+        const session = await authService.getSession();
+        const currentUser = session?.user || null;
+
+        if (!isActive) {
+          return;
+        }
+
+        const onboarding = extractOnboardingState(profile);
+        setOnboardingState((previous) => {
+          if (!onboarding && !previous) {
+            return previous;
+          }
+          if (onboarding && previous) {
+            const sameCompletion = previous.completed === onboarding.completed;
+            const sameData =
+              JSON.stringify(previous.data) === JSON.stringify(onboarding.data);
+            if (sameCompletion && sameData) {
+              return previous;
+            }
+          }
+          return onboarding ?? null;
+        });
+
+        if (!manualOnboardingTrigger) {
+          // Show the intro popup only for:
+          // 1. New users who haven't completed onboarding yet, OR
+          // 2. Users who haven't completed onboarding and are coming back (with error fallback)
+          // Check if user is new using the helper function
+          const isActuallyNew = isNewUser(profile, currentUser);
+          const shouldAutoShow = (!onboarding?.completed && isActuallyNew) ||
+                                (!onboarding?.completed && !hasDismissedOnboarding && !profile);
+          setShowIntroPopup(shouldAutoShow);
+        }
+      } catch (error) {
+        console.error('Failed to load onboarding status', error);
+        if (isActive) {
+          setOnboardingState(null);
+          if (!manualOnboardingTrigger) {
+            // If we can't determine onboarding status, we still want to prevent the popup
+            // from appearing on every login for existing users
+            setShowIntroPopup(false);
+          }
+        }
+      }
+    };
+
+    void evaluateOnboarding();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id, hasDismissedOnboarding, manualOnboardingTrigger]);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -94,7 +174,6 @@ export function App() {
     scrollToTop();
     if (userData) {
       setUser(userData);
-      setShowIntroPopup(true);
     } else {
       setCurrentScreen('auth');
     }
@@ -103,10 +182,53 @@ export function App() {
   const handleAuthSuccess = (userData: AppUser) => {
     scrollToTop();
     setUser(userData);
+  };
+
+  const handleRedoOnboarding = () => {
+    if (!user) {
+      return;
+    }
+    setHasDismissedOnboarding(false);
+    setManualOnboardingTrigger(true);
     setShowIntroPopup(true);
   };
 
-  const handleIntroComplete = (_profileData?: unknown) => {
+  const handleIntroComplete = async (profileData: OnboardingProfileData | null) => {
+    setHasDismissedOnboarding(true);
+    setManualOnboardingTrigger(false);
+
+    if (user?.id && profileData) {
+      const trimmedName = profileData.fullName.trim();
+      const trimmedCourse = profileData.courseOfStudy.trim();
+
+      try {
+        const savedState = await saveOnboardingProfile(user.id, profileData);
+        setOnboardingState(savedState);
+        setUser((previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          const nextUser: AppUser = {
+            ...previous,
+            ...(trimmedName ? { name: trimmedName } : {})
+          };
+
+          if (profileData.age !== null) {
+            nextUser.age = profileData.age;
+          }
+
+          if (trimmedCourse) {
+            nextUser.courseOfStudy = trimmedCourse;
+          }
+
+          return nextUser;
+        });
+      } catch (error) {
+        console.error('Failed to save onboarding details', error);
+      }
+    }
+
     setShowIntroPopup(false);
     setCurrentScreen('dashboard');
   };
@@ -140,14 +262,15 @@ export function App() {
       await authService.signOut();
     } catch (error) {
       console.error('Failed to sign out from Supabase', error);
-    } finally {
-      setUser(null);
-      setSelectedGoalId(null);
-      setSelectedOpportunity(null);
-      setShowIntroPopup(false);
-      setCurrentScreen('landing');
-    }
-  };
+      } finally {
+        setUser(null);
+        setSelectedGoalId(null);
+        setSelectedOpportunity(null);
+        setShowIntroPopup(false);
+        setHasDismissedOnboarding(false);
+        setCurrentScreen('landing');
+      }
+    };
 
   const handleNavigate = (screen: Screen | string) => {
     scrollToTop();
@@ -214,6 +337,8 @@ export function App() {
             onNavigate={handleNavigate}
             onAddGoal={handleAddGoal}
             onViewAllGoals={handleViewAllGoals}
+            onboardingProfile={onboardingState?.data ?? null}
+            onRedoOnboarding={handleRedoOnboarding}
           />
         );
       case 'profile':
@@ -261,6 +386,8 @@ export function App() {
           <PersonalizedRoadmap 
             onBack={() => handleBack('dashboard')}
             goalId={selectedGoalId ?? undefined}
+            onboardingProfile={onboardingState?.data ?? null}
+            onRedoOnboarding={handleRedoOnboarding}
           />
         );
       case 'opportunity-roadmap':
@@ -284,6 +411,8 @@ export function App() {
             onBack={() => handleBack('profile')}
             onNavigate={handleNavigate}
             onLogout={handleLogout}
+            onRedoOnboarding={handleRedoOnboarding}
+            onboardingProfile={onboardingState?.data ?? null}
           />
         );
       case 'profile-edit':
@@ -336,6 +465,12 @@ export function App() {
             user={user}
           />
         );
+      case 'achievements':
+        return (
+          <AchievementsScreen
+            onBack={() => handleBack('dashboard')}
+          />
+        );
       default:
         return <LandingPage onGetStarted={() => handleGetStarted()} />;
     }
@@ -360,6 +495,7 @@ export function App() {
           isOpen={showIntroPopup}
           onComplete={handleIntroComplete}
           userName={user.name}
+          initialData={onboardingState?.data ?? null}
         />
       )}
     </div>

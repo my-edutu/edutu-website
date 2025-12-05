@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../firebase/firebase';
+import { supabase } from '../lib/supabaseClient';
+import type { User } from '@supabase/supabase-js';
 
 interface AdminCheckState {
   isAdmin: boolean;
@@ -37,18 +37,40 @@ export function useAdminCheck(): AdminCheckState {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    // Get initial user state
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error) {
+        console.error('Error getting user:', error);
+        setState(prev => ({ ...prev, loading: false, user: null, isAdmin: false }));
+        return;
+      }
+
       const override = hasAdminOverride();
-      const isAdmin = override || isWhitelistedAdmin(firebaseUser);
+      const isAdmin = override || isWhitelistedAdmin(user);
 
       setState({
-        user: firebaseUser,
+        user: user,
         loading: false,
         isAdmin
       });
     });
 
-    return () => unsubscribe();
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const supabaseUser = session?.user || null;
+      const override = hasAdminOverride();
+      const isAdmin = override || isWhitelistedAdmin(supabaseUser);
+
+      setState({
+        user: supabaseUser,
+        loading: false,
+        isAdmin
+      });
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   return state;

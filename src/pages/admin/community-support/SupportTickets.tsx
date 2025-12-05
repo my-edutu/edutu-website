@@ -7,8 +7,7 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc
-} from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+} from '../../../lib/firebaseMock';
 import TicketModal, { SupportTicket, TicketMessage } from '../../../components/admin/community/TicketModal';
 
 const SupportTickets: React.FC = () => {
@@ -43,17 +42,13 @@ const SupportTickets: React.FC = () => {
   };
 
   const fetchTickets = useCallback(async () => {
-    if (!db) {
-      setError('Firestore is not initialised. Check your Firebase configuration.');
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      const snapshot = await getDocs(collection(db, 'support_tickets'));
+      // Using mock implementation for now
+      console.log('Fetching support tickets (using mock implementation)');
+      const snapshot = await getDocs(collection(null as any, 'support_tickets'));
       const items: SupportTicket[] = snapshot.docs.map((ticketDoc) => {
         const data = ticketDoc.data() as Record<string, unknown>;
         return {

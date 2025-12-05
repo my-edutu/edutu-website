@@ -7,519 +7,334 @@ import React, {
   useRef,
   useState
 } from 'react';
-import { usePersistentState } from './usePersistentState';
-import { useGoals, type Goal } from './useGoals';
-import type { Opportunity } from '../types/opportunity';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient';
 import type {
   AppNotification,
-  GoalReminderPreference,
   NotificationDraft,
-  NotificationSeverity,
-  PushPermissionState,
-  ReminderPreferenceMap
+  PushPermissionState
 } from '../types/notification';
-
-const NOTIFICATIONS_STORAGE_KEY = 'edutu.notifications.v1';
-const REMINDERS_STORAGE_KEY = 'edutu.reminders.v1';
-const OPPORTUNITY_DIGEST_STORAGE_KEY = 'edutu.opportunityDigest.v1';
-const MAX_INBOX_ITEMS = 120;
+import {
+  deleteNotification as deleteNotificationService,
+  fetchNotifications,
+  getNotificationPreferences,
+  markAllNotificationsRead,
+  markNotificationRead,
+  registerPushToken,
+  saveNotificationPreferences,
+  sendNotification as sendNotificationService,
+  unregisterPushToken,
+  type FetchNotificationsParams,
+  type NotificationPreferences
+} from '../services/notifications';
 
 interface NotificationsContextValue {
   notifications: AppNotification[];
   unreadCount: number;
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  fetchMore: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  sendNotification: (draft: NotificationDraft, options?: { userId?: string }) => Promise<AppNotification | null>;
+  preferences: NotificationPreferences | null;
+  savePreferences: (updates: Partial<NotificationPreferences>) => Promise<void>;
+  refreshPreferences: () => Promise<void>;
   pushPermission: PushPermissionState;
-  addNotification: (draft: NotificationDraft, options?: { silent?: boolean }) => AppNotification;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
-  deleteNotification: (id: string) => void;
-  clearNotifications: () => void;
-  getReminderPreference: (goalId: string) => GoalReminderPreference | undefined;
-  setReminderPreference: (
-    goalId: string,
-    updates: Partial<Omit<GoalReminderPreference, 'goalId'>>
-  ) => void;
-  removeReminderPreference: (goalId: string) => void;
-  recordOpportunityHighlights: (opportunities: Opportunity[]) => void;
-  requestPushPermission: () => Promise<NotificationPermission | 'unsupported'>;
-  sendAdminBroadcast: (input: {
-    title: string;
-    body: string;
-    severity?: NotificationSeverity;
-    linkUrl?: string;
-  }) => AppNotification;
+  requestPushPermission: () => Promise<PushPermissionState>;
+  registerPushToken: (token: string, metadata?: Record<string, unknown>) => Promise<void>;
+  unregisterPushToken: (token: string) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
 
-function createNotificationId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+const mapRealtimeRow = (row: Record<string, unknown>): AppNotification | null => {
+  if (!row?.id || typeof row.id !== 'string') {
+    return null;
   }
-  return `notif-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-function normaliseDraft(draft: NotificationDraft): NotificationDraft {
-  return {
-    ...draft,
-    title: draft.title.trim(),
-    body: draft.body.trim()
-  };
-}
-
-function shouldSendAgain(lastSent: string | null | undefined, hoursThreshold: number) {
-  if (!lastSent) {
-    return true;
-  }
-  const parsed = Date.parse(lastSent);
-  if (Number.isNaN(parsed)) {
-    return true;
-  }
-  const elapsedMs = Date.now() - parsed;
-  return elapsedMs >= hoursThreshold * 60 * 60 * 1000;
-}
-
-function pickNextGoal(currentGoalId: string, goals: Goal[]): Goal | null {
-  const priorityWeight: Record<string, number> = {
-    high: 0,
-    medium: 1,
-    low: 2
-  };
-
-  const candidates = goals
-    .filter((goal) => goal.id !== currentGoalId && goal.status === 'active')
-    .sort((a, b) => {
-      const aPriority = typeof a.priority === 'string' ? priorityWeight[a.priority] ?? 1 : 1;
-      const bPriority = typeof b.priority === 'string' ? priorityWeight[b.priority] ?? 1 : 1;
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority;
-      }
-
-      const aDeadline = a.deadline ? Date.parse(a.deadline) : Number.POSITIVE_INFINITY;
-      const bDeadline = b.deadline ? Date.parse(b.deadline) : Number.POSITIVE_INFINITY;
-      return aDeadline - bDeadline;
-    });
-
-  return candidates.length > 0 ? candidates[0] : null;
-}
-
-function buildReminderMessage(goal: Goal, goals: Goal[], cadence: 'daily' | 'weekly') {
-  const nextGoal = pickNextGoal(goal.id, goals);
-  const nextGoalLabel = nextGoal ? `"${nextGoal.title}" (${Math.round(nextGoal.progress)}% ready)` : 'staying consistent';
-  const cadenceCopy =
-    cadence === 'daily' ? 'Daily check-in' : 'Weekly focus review';
 
   return {
-    title: `${cadenceCopy}: ${goal.title}`,
-    body: `You're ${Math.round(goal.progress)}% through "${goal.title}". Next up: ${nextGoalLabel}.`
+    id: row.id,
+    kind: (row.kind as AppNotification['kind']) ?? 'system',
+    title: typeof row.title === 'string' ? row.title : 'Notification',
+    body: typeof row.body === 'string' ? row.body : '',
+    severity: (row.severity as AppNotification['severity']) ?? 'info',
+    metadata: (row.metadata as Record<string, unknown>) ?? undefined,
+    dedupeKey: typeof row.dedupe_key === 'string' ? row.dedupe_key : undefined,
+    createdAt: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+    readAt: typeof row.read_at === 'string' ? row.read_at : row.read_at === null ? null : null
   };
-}
-
-function ensureReminderEntry(map: ReminderPreferenceMap, goalId: string): GoalReminderPreference {
-  const existing = map[goalId];
-  if (existing) {
-    return existing;
-  }
-  return {
-    goalId,
-    daily: false,
-    weekly: false,
-    lastDailySentAt: null,
-    lastWeeklySentAt: null
-  };
-}
+};
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { goals } = useGoals();
-  const [notifications, setNotifications] = usePersistentState<AppNotification[]>(
-    NOTIFICATIONS_STORAGE_KEY,
-    []
-  );
-  const [reminderPreferences, setReminderPreferences] = usePersistentState<ReminderPreferenceMap>(
-    REMINDERS_STORAGE_KEY,
-    {}
-  );
-  const [digestState, setDigestState] = usePersistentState(
-    OPPORTUNITY_DIGEST_STORAGE_KEY,
-    {
-      seenOpportunityIds: [] as string[],
-      lastDigestAt: null as string | null
+  const [session, setSession] = useState<Session | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const [pushPermission, setPushPermission] = useState<PushPermissionState>(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return 'unsupported';
     }
-  );
-  const [pushPermission, setPushPermission] = useState<PushPermissionState>('unsupported');
+    return Notification.permission;
+  });
 
-  const remindersRef = useRef(reminderPreferences);
-  const goalsRef = useRef(goals);
-  const digestStateRef = useRef(digestState);
+  const nextCursorRef = useRef<string | null>(null);
+  const fetchingRef = useRef(false);
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  useEffect(() => {
-    remindersRef.current = reminderPreferences;
-  }, [reminderPreferences]);
-
-  useEffect(() => {
-    goalsRef.current = goals;
-  }, [goals]);
-
-  useEffect(() => {
-    digestStateRef.current = digestState;
-  }, [digestState]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    if (!('Notification' in window)) {
-      setPushPermission('unsupported');
-      return;
-    }
-    setPushPermission(Notification.permission);
+  const resetState = useCallback(() => {
+    setNotifications([]);
+    setPreferences(null);
+    setError(null);
+    setHasMore(false);
+    nextCursorRef.current = null;
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === NOTIFICATIONS_STORAGE_KEY && event.newValue) {
-        try {
-          const parsed = JSON.parse(event.newValue) as AppNotification[];
-          setNotifications(parsed);
-        } catch (error) {
-          console.warn('Unable to sync notifications from storage', error);
-        }
-        return;
-      }
-
-      if (event.key === REMINDERS_STORAGE_KEY && event.newValue) {
-        try {
-          const parsed = JSON.parse(event.newValue) as ReminderPreferenceMap;
-          setReminderPreferences(parsed);
-        } catch (error) {
-          console.warn('Unable to sync reminder preferences from storage', error);
-        }
-        return;
-      }
-
-      if (event.key === OPPORTUNITY_DIGEST_STORAGE_KEY && event.newValue) {
-        try {
-          const parsed = JSON.parse(event.newValue) as typeof digestStateRef.current;
-          setDigestState(parsed);
-        } catch (error) {
-          console.warn('Unable to sync opportunity digest state', error);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [setDigestState, setNotifications, setReminderPreferences]);
-
-  useEffect(() => {
-    const activeGoalIds = new Set(goals.map((goal) => goal.id));
-    let mutated = false;
-    const nextState: ReminderPreferenceMap = {};
-    Object.entries(reminderPreferences).forEach(([goalId, value]) => {
-      if (activeGoalIds.has(goalId)) {
-        nextState[goalId] = value;
-      } else {
-        mutated = true;
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) {
+        setSession(data.session ?? null);
       }
     });
-    if (mutated) {
-      setReminderPreferences(nextState);
-    }
-  }, [goals, reminderPreferences, setReminderPreferences]);
 
-  const maybeShowNativeNotification = useCallback(
-    (entry: AppNotification) => {
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const loadNotifications = useCallback(
+    async (options: FetchNotificationsParams = {}) => {
+      if (!session?.user || fetchingRef.current) {
         return;
       }
-      if (!('Notification' in window)) {
-        return;
-      }
-      if (pushPermission !== 'granted') {
-        return;
-      }
+
+      fetchingRef.current = true;
+      setLoading(true);
+      setError(null);
 
       try {
-        const isWindowVisible = document.visibilityState === 'visible';
-        if (isWindowVisible) {
-          return;
-        }
-        new Notification(entry.title, {
-          body: entry.body,
-          tag: entry.id,
-          data: entry.metadata ?? {}
+        const limit = options.limit ?? 20;
+        const data = await fetchNotifications(options);
+
+        setNotifications((prev) => {
+          if (!options.cursor) {
+            return data;
+          }
+          const newestIds = new Set(prev.map((item) => item.id));
+          const merged = [...prev];
+          data.forEach((item) => {
+            if (!newestIds.has(item.id)) {
+              merged.push(item);
+            }
+          });
+          return merged;
         });
-      } catch (error) {
-        console.warn('Unable to display native notification', error);
+
+        if (data.length < limit) {
+          setHasMore(false);
+          nextCursorRef.current = null;
+        } else {
+          const last = data[data.length - 1];
+          nextCursorRef.current = last?.createdAt ?? null;
+          setHasMore(Boolean(last));
+        }
+      } catch (fetchError) {
+        console.error('Failed to load notifications', fetchError);
+        setError(fetchError instanceof Error ? fetchError.message : 'Unable to load notifications.');
+      } finally {
+        fetchingRef.current = false;
+        setLoading(false);
       }
     },
-    [pushPermission]
+    [session?.user]
   );
 
-  const addNotification = useCallback(
-    (input: NotificationDraft, options?: { silent?: boolean }) => {
-      const draft = normaliseDraft(input);
-      const now = new Date().toISOString();
+  const fetchMore = useCallback(async () => {
+    if (!hasMore || !nextCursorRef.current) {
+      return;
+    }
+    await loadNotifications({ cursor: nextCursorRef.current });
+  }, [hasMore, loadNotifications]);
 
-      let createdEntry: AppNotification | null = null;
-      setNotifications((prev) => {
-        if (
-          draft.dedupeKey &&
-          prev.some((existing) => existing.dedupeKey === draft.dedupeKey)
-        ) {
-          const already = prev.find((existing) => existing.dedupeKey === draft.dedupeKey);
-          if (already) {
-            createdEntry = already;
-          }
-          return prev;
-        }
-
-        const entry: AppNotification = {
-          id: createNotificationId(),
-          kind: draft.kind,
-          title: draft.title,
-          body: draft.body,
-          createdAt: now,
-          readAt: null,
-          severity: draft.severity ?? 'info',
-          metadata: draft.metadata,
-          dedupeKey: draft.dedupeKey
-        };
-        createdEntry = entry;
-        return [entry, ...prev].slice(0, MAX_INBOX_ITEMS);
-      });
-
-      if (!options?.silent && createdEntry) {
-        maybeShowNativeNotification(createdEntry);
-      }
-
-      return createdEntry ?? {
-        id: createNotificationId(),
-        kind: draft.kind,
-        title: draft.title,
-        body: draft.body,
-        createdAt: now,
-        readAt: now,
-        severity: draft.severity ?? 'info',
-        metadata: draft.metadata,
-        dedupeKey: draft.dedupeKey
-      };
-    },
-    [maybeShowNativeNotification, setNotifications]
-  );
-
-  const markAsRead = useCallback(
-    (id: string) => {
-      setNotifications((prev) =>
-        prev.map((item) =>
-          item.id === id && item.readAt === null
-            ? { ...item, readAt: new Date().toISOString() }
-            : item
-        )
-      );
-    },
-    [setNotifications]
-  );
-
-  const markAllAsRead = useCallback(() => {
-    const now = new Date().toISOString();
-    setNotifications((prev) =>
-      prev.map((item) => (item.readAt ? item : { ...item, readAt: now }))
-    );
-  }, [setNotifications]);
-
-  const deleteNotification = useCallback(
-    (id: string) => {
-      setNotifications((prev) => prev.filter((item) => item.id !== id));
-    },
-    [setNotifications]
-  );
-
-  const clearNotifications = useCallback(() => {
-    setNotifications([]);
-  }, [setNotifications]);
-
-  const getReminderPreference = useCallback(
-    (goalId: string) => reminderPreferences[goalId],
-    [reminderPreferences]
-  );
-
-  const setReminderPreference = useCallback(
-    (goalId: string, updates: Partial<Omit<GoalReminderPreference, 'goalId'>>) => {
-      setReminderPreferences((prev) => {
-        const nextEntry = {
-          ...ensureReminderEntry(prev, goalId),
-          ...updates,
-          goalId
-        };
-
-        if (!nextEntry.daily && !nextEntry.weekly) {
-          const { [goalId]: _removed, ...rest } = prev;
-          return rest;
-        }
-
-        return {
-          ...prev,
-          [goalId]: nextEntry
-        };
-      });
-    },
-    [setReminderPreferences]
-  );
-
-  const removeReminderPreference = useCallback(
-    (goalId: string) => {
-      setReminderPreferences((prev) => {
-        if (!(goalId in prev)) {
-          return prev;
-        }
-        const { [goalId]: _removed, ...rest } = prev;
-        return rest;
-      });
-    },
-    [setReminderPreferences]
-  );
-
-  const touchReminderSent = useCallback(
-    (goalId: string, cadence: 'daily' | 'weekly') => {
-      const field = cadence === 'daily' ? 'lastDailySentAt' : 'lastWeeklySentAt';
-      setReminderPreferences((prev) => {
-        const entry = prev[goalId];
-        if (!entry) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [goalId]: {
-            ...entry,
-            [field]: new Date().toISOString()
-          }
-        };
-      });
-    },
-    [setReminderPreferences]
-  );
+  const loadPreferences = useCallback(async () => {
+    if (!session?.user) {
+      setPreferences(null);
+      return;
+    }
+    try {
+      const prefs = await getNotificationPreferences(session.user.id);
+      setPreferences(prefs);
+    } catch (prefError) {
+      console.error('Failed to load notification preferences', prefError);
+    }
+  }, [session?.user]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (!session?.user) {
+      resetState();
+      setLoading(false);
       return;
     }
 
-    const checkReminders = () => {
-      const activeGoals = goalsRef.current;
-      if (activeGoals.length === 0) {
-        return;
+    loadNotifications();
+    void loadPreferences();
+  }, [session?.user, loadNotifications, loadPreferences, resetState]);
+
+  useEffect(() => {
+    if (!session?.user) {
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
       }
+      return;
+    }
 
-      const prefs = remindersRef.current;
-      const now = new Date();
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+      realtimeChannelRef.current = null;
+    }
 
-      activeGoals.forEach((goal) => {
-        const preference = prefs[goal.id];
-        if (!preference) {
-          return;
+    const channel = supabase
+      .channel(`notifications:${session.user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` },
+        (payload) => {
+          const mapped = mapRealtimeRow(payload.new);
+          if (mapped) {
+            setNotifications((prev) => {
+              const exists = prev.find((item) => item.id === mapped.id);
+              if (exists) {
+                return prev;
+              }
+              return [mapped, ...prev];
+            });
+          }
         }
-
-        if (preference.daily && shouldSendAgain(preference.lastDailySentAt, 24)) {
-          const { title, body } = buildReminderMessage(goal, activeGoals, 'daily');
-          addNotification(
-            {
-              kind: 'goal-reminder',
-              title,
-              body,
-              severity: 'info',
-              metadata: {
-                goalId: goal.id,
-                cadence: 'daily',
-                triggeredAt: now.toISOString()
-              },
-              dedupeKey: `goal-${goal.id}-daily-${now.toDateString()}`
-            },
-            { silent: false }
-          );
-          touchReminderSent(goal.id, 'daily');
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` },
+        (payload) => {
+          const mapped = mapRealtimeRow(payload.new);
+          if (mapped) {
+            setNotifications((prev) =>
+              prev.map((item) => (item.id === mapped.id ? { ...item, ...mapped } : item))
+            );
+          }
         }
-
-        if (preference.weekly && shouldSendAgain(preference.lastWeeklySentAt, 24 * 7)) {
-          const { title, body } = buildReminderMessage(goal, activeGoals, 'weekly');
-          addNotification(
-            {
-              kind: 'goal-weekly-digest',
-              title,
-              body,
-              severity: 'success',
-              metadata: {
-                goalId: goal.id,
-                cadence: 'weekly',
-                triggeredAt: now.toISOString()
-              },
-              dedupeKey: `goal-${goal.id}-weekly-${now.getFullYear()}-${now.getWeek?.() ?? now.getMonth()}-${now.getDay()}`
-            },
-            { silent: false }
-          );
-          touchReminderSent(goal.id, 'weekly');
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` },
+        (payload) => {
+          const deletedId = typeof payload.old?.id === 'string' ? payload.old.id : null;
+          if (deletedId) {
+            setNotifications((prev) => prev.filter((item) => item.id !== deletedId));
+          }
         }
-      });
-    };
+      )
+      .subscribe();
 
-    const initialTimer = window.setTimeout(checkReminders, 2000);
-    const interval = window.setInterval(checkReminders, 15 * 60 * 1000);
+  realtimeChannelRef.current = channel;
 
     return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+      realtimeChannelRef.current = null;
     };
-  }, [addNotification, touchReminderSent]);
+  }, [session?.user]);
 
-  const recordOpportunityHighlights = useCallback(
-    (opportunities: Opportunity[]) => {
-      if (!Array.isArray(opportunities) || opportunities.length === 0) {
-        return;
+  const markAsReadHandler = useCallback(
+    async (notificationId: string) => {
+      await markNotificationRead(notificationId, true);
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === notificationId ? { ...item, readAt: new Date().toISOString() } : item))
+      );
+    },
+    []
+  );
+
+  const markAllAsReadHandler = useCallback(async () => {
+    if (!session?.user) {
+      return;
+    }
+    await markAllNotificationsRead(session.user.id);
+    const timestamp = new Date().toISOString();
+    setNotifications((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? timestamp })));
+  }, [session?.user]);
+
+  const deleteNotificationHandler = useCallback(async (notificationId: string) => {
+    await deleteNotificationService(notificationId);
+    setNotifications((prev) => prev.filter((item) => item.id !== notificationId));
+  }, []);
+
+  const sendNotificationHandler = useCallback(
+    async (draft: NotificationDraft, options?: { userId?: string }) => {
+      const userId = options?.userId ?? session?.user?.id;
+      if (!userId) {
+        console.warn('Cannot send notification without a user id');
+        return null;
       }
 
-      setDigestState((prev) => {
-        const seen = new Set(prev.seenOpportunityIds);
-        const topMatches = opportunities.slice(0, 3).filter((item) => item && item.id);
-        const freshEntries = topMatches.filter((item) => !seen.has(item.id));
-
-        if (freshEntries.length === 0) {
+      const entry = await sendNotificationService(userId, draft);
+      setNotifications((prev) => {
+        const exists = prev.find((item) => item.id === entry.id);
+        if (exists) {
           return prev;
         }
-
-        freshEntries.forEach((item, index) => {
-          const matchScore = typeof item.match === 'number' ? Math.round(item.match) : undefined;
-          const scoreCopy = typeof matchScore === 'number' ? `Match score ${matchScore}%` : 'Fresh opportunity waiting for you';
-          addNotification(
-            {
-              kind: 'opportunity-highlight',
-              title: `New top match: ${item.title}`,
-              body: `${scoreCopy} • ${item.organization}`,
-              severity: 'success',
-              metadata: {
-                opportunityId: item.id,
-                rank: index + 1
-              },
-              dedupeKey: `opportunity-${item.id}`
-            },
-            { silent: index > 0 }
-          );
-        });
-
-        const updatedSeen = Array.from(
-          new Set([...prev.seenOpportunityIds, ...freshEntries.map((item) => item.id)])
-        ).slice(-60);
-
-        return {
-          seenOpportunityIds: updatedSeen,
-          lastDigestAt: new Date().toISOString()
-        };
+        return [entry, ...prev];
       });
+      return entry;
     },
-    [addNotification, setDigestState]
+    [session?.user?.id]
   );
+
+  const savePreferencesHandler = useCallback(
+    async (updates: Partial<NotificationPreferences>) => {
+      if (!session?.user) {
+        throw new Error('User must be signed in to update notification preferences.');
+      }
+
+      const nextPreferences: NotificationPreferences = {
+        ...(preferences ?? {
+          pushNotifications: true,
+          emailNotifications: false,
+          opportunityAlerts: true,
+          deadlineReminders: true,
+          goalReminders: true,
+          achievementCelebrations: true,
+          weeklyDigest: false,
+          marketingEmails: false,
+          quietHours: { start: '22:00', end: '08:00' },
+          updatedAt: new Date().toISOString()
+        }),
+        ...updates,
+        quietHours: {
+          ...(preferences?.quietHours ?? { start: '22:00', end: '08:00' }),
+          ...(updates.quietHours ?? {})
+        },
+        updatedAt: new Date().toISOString()
+      };
+
+      await saveNotificationPreferences(session.user.id, nextPreferences);
+      setPreferences(nextPreferences);
+    },
+    [preferences, session?.user]
+  );
+
+  const refreshPreferences = useCallback(async () => {
+    await loadPreferences();
+  }, [loadPreferences]);
 
   const requestPushPermission = useCallback(async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -537,28 +352,31 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     return permission;
   }, []);
 
-  const sendAdminBroadcast = useCallback(
-    (input: { title: string; body: string; severity?: NotificationSeverity; linkUrl?: string }) => {
-      const entry = addNotification(
-        {
-          kind: 'admin-broadcast',
-          title: input.title,
-          body: input.body,
-          severity: input.severity ?? 'warning',
-          metadata: {
-            linkUrl: input.linkUrl,
-            issuedAt: new Date().toISOString()
-          }
-        },
-        { silent: false }
-      );
-      return entry;
+  const registerPushTokenHandler = useCallback(
+    async (token: string, metadata?: Record<string, unknown>) => {
+      if (!session?.user) {
+        throw new Error('User must be signed in to register a push token.');
+      }
+      await registerPushToken(session.user.id, {
+        token,
+        device: metadata
+      });
     },
-    [addNotification]
+    [session?.user]
+  );
+
+  const unregisterPushTokenHandler = useCallback(
+    async (token: string) => {
+      if (!session?.user) {
+        return;
+      }
+      await unregisterPushToken(session.user.id, token);
+    },
+    [session?.user]
   );
 
   const unreadCount = useMemo(
-    () => notifications.filter((item) => !item.readAt).length,
+    () => notifications.filter((notification) => !notification.readAt).length,
     [notifications]
   );
 
@@ -566,34 +384,40 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     () => ({
       notifications,
       unreadCount,
+      loading,
+      error,
+      hasMore,
+      fetchMore,
+      markAsRead: markAsReadHandler,
+      markAllAsRead: markAllAsReadHandler,
+      deleteNotification: deleteNotificationHandler,
+      sendNotification: sendNotificationHandler,
+      preferences,
+      savePreferences: savePreferencesHandler,
+      refreshPreferences,
       pushPermission,
-      addNotification,
-      markAsRead,
-      markAllAsRead,
-      deleteNotification,
-      clearNotifications,
-      getReminderPreference,
-      setReminderPreference,
-      removeReminderPreference,
-      recordOpportunityHighlights,
       requestPushPermission,
-      sendAdminBroadcast
+      registerPushToken: registerPushTokenHandler,
+      unregisterPushToken: unregisterPushTokenHandler
     }),
     [
       notifications,
       unreadCount,
+      loading,
+      error,
+      hasMore,
+      fetchMore,
+      markAsReadHandler,
+      markAllAsReadHandler,
+      deleteNotificationHandler,
+      sendNotificationHandler,
+      preferences,
+      savePreferencesHandler,
+      refreshPreferences,
       pushPermission,
-      addNotification,
-      markAsRead,
-      markAllAsRead,
-      deleteNotification,
-      clearNotifications,
-      getReminderPreference,
-      setReminderPreference,
-      removeReminderPreference,
-      recordOpportunityHighlights,
       requestPushPermission,
-      sendAdminBroadcast
+      registerPushTokenHandler,
+      unregisterPushTokenHandler
     ]
   );
 
@@ -607,4 +431,3 @@ export function useNotifications() {
   }
   return context;
 }
-

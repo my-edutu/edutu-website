@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Search, Star, Calendar, MapPin } from 'lucide-react';
+import { ArrowLeft, Search, Star, Calendar, MapPin, Filter } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
-import { useOpportunities } from '../hooks/useOpportunities';
+import { usePersonalizedOpportunities } from '../hooks/usePersonalizedOpportunities';
 import type { Opportunity } from '../types/opportunity';
 
 interface AllOpportunitiesProps {
@@ -29,8 +29,22 @@ const getDifficultyColor = (difficulty?: string | null) => {
 const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpportunity }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showFilters, setShowFilters] = useState(false);
   const { isDarkMode } = useDarkMode();
-  const { data: opportunities, loading, error, refresh } = useOpportunities();
+  const {
+    data: personalizedOpportunities,
+    loading,
+    error,
+    refresh,
+    userPreferences,
+    updateUserPreferences
+  } = usePersonalizedOpportunities();
+
+  // Extract the opportunities from the personalized data
+  const opportunities = useMemo(() =>
+    personalizedOpportunities.map(item => item.opportunity),
+    [personalizedOpportunities]
+  );
 
   const categories = useMemo(() => {
     const dynamic = new Set<string>();
@@ -51,7 +65,7 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
   const filteredOpportunities = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
-    return opportunities.filter((opportunity) => {
+    return personalizedOpportunities.filter(({ opportunity, matchScore }) => {
       if (selectedCategory !== 'All' && opportunity.category !== selectedCategory) {
         return false;
       }
@@ -73,18 +87,18 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
 
       return haystack.includes(term);
     });
-  }, [opportunities, searchTerm, selectedCategory]);
+  }, [personalizedOpportunities, searchTerm, selectedCategory]);
 
   const headerSubtitle = useMemo(() => {
     if (loading) {
-      return 'Loading opportunities...';
+      return 'Loading personalized opportunities...';
     }
 
     if (error) {
       return 'We ran into a problem fetching opportunities';
     }
 
-    return `${filteredOpportunities.length} opportunities available`;
+    return `${filteredOpportunities.length} personalized opportunities available`;
   }, [error, filteredOpportunities.length, loading]);
 
   const scrollToTop = () => {
@@ -98,6 +112,18 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
 
   const showEmptyState = !loading && !error && filteredOpportunities.length === 0;
 
+  // Function to handle preference updates
+  const handleUpdatePreferences = () => {
+    if (userPreferences) {
+      // Example: update with temporary values, in real app these would come from UI
+      updateUserPreferences({
+        interests: ['Technology', 'Leadership', 'Entrepreneurship'],
+        preferredCategories: ['Tech', 'Leadership'],
+        experienceLevel: 'intermediate'
+      });
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-white dark:bg-gray-900 animate-fade-in ${isDarkMode ? 'dark' : ''}`}>
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
@@ -107,10 +133,16 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
               <ArrowLeft size={20} />
             </Button>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">All Opportunities</h1>
+              <h1 className="text-xl font-bold text-gray-800 dark:text-white">Personalized Opportunities</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">{headerSubtitle}</p>
             </div>
-            <Button variant="secondary" size="sm" onClick={refresh} disabled={loading} className="shrink-0">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={refresh}
+              disabled={loading}
+              className="shrink-0"
+            >
               Refresh
             </Button>
           </div>
@@ -140,7 +172,72 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
                 {category}
               </button>
             ))}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
+                showFilters
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <Filter size={16} /> Filters
+            </button>
           </div>
+
+          {showFilters && userPreferences && (
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600">
+              <h3 className="font-medium text-gray-800 dark:text-white mb-2">Your Preferences</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Interests</label>
+                  <input
+                    type="text"
+                    value={userPreferences.interests.join(', ')}
+                    onChange={(e) => updateUserPreferences({ interests: e.target.value.split(',').map(i => i.trim()) })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
+                    placeholder="e.g., Technology, Leadership"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Preferred Categories</label>
+                  <input
+                    type="text"
+                    value={userPreferences.preferredCategories.join(', ')}
+                    onChange={(e) => updateUserPreferences({ preferredCategories: e.target.value.split(',').map(c => c.trim()) })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
+                    placeholder="e.g., Tech, Scholarships"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Experience Level</label>
+                  <select
+                    value={userPreferences.experienceLevel}
+                    onChange={(e) => updateUserPreferences({ experienceLevel: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={userPreferences.location || ''}
+                    onChange={(e) => updateUserPreferences({ location: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
+                    placeholder="Your location"
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button variant="secondary" size="sm" onClick={handleUpdatePreferences}>
+                  Apply Preferences
+                </Button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <Card className="mt-4 border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
@@ -178,7 +275,7 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
           ))}
 
         {!loading &&
-          filteredOpportunities.map((opportunity, index) => (
+          filteredOpportunities.map(({ opportunity, matchScore }, index) => (
             <Card
               key={opportunity.id}
               className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] animate-slide-up"
@@ -205,8 +302,12 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
                     </div>
                     <div className="flex items-center gap-1 ml-2">
                       <Star size={14} className="text-yellow-500" />
-                      <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                        {Math.round(opportunity.match ?? 0)}%
+                      <span className={`text-sm font-medium ${
+                        matchScore >= 70 ? 'text-green-600 dark:text-green-400' :
+                        matchScore >= 40 ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-red-600 dark:text-red-400'
+                      }`}>
+                        {Math.round(matchScore)}% match
                       </span>
                     </div>
                   </div>

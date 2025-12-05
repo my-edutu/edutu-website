@@ -7,8 +7,7 @@ import {
   orderBy,
   query,
   setDoc
-} from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+} from '../../../lib/firebaseMock';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/Table';
 import Select from '../../ui/Select';
 import Badge from '../../ui/Badge';

@@ -1,5 +1,6 @@
 import type { Opportunity, OpportunityDifficulty } from '../types/opportunity';
 import { syncOpportunityInventorySnapshot } from './analyticsAggregator';
+import { updateOpportunitiesInN8n } from './n8nIntegration';
 
 const DEFAULT_ENDPOINT = '/data/opportunities.json';
 
@@ -8,6 +9,7 @@ let cachedOpportunities: Opportunity[] | null = null;
 interface FetchOptions {
   signal?: AbortSignal;
   force?: boolean;
+  userId?: string; // Optional userId for n8n integration
 }
 
 const getEndpoint = () => {
@@ -18,7 +20,7 @@ const getEndpoint = () => {
 };
 
 export async function fetchOpportunities(options: FetchOptions = {}): Promise<Opportunity[]> {
-  const { signal, force } = options;
+  const { signal, force, userId } = options;
 
   if (!force && cachedOpportunities) {
     return cachedOpportunities;
@@ -45,8 +47,13 @@ export async function fetchOpportunities(options: FetchOptions = {}): Promise<Op
   void (async () => {
     try {
       await syncOpportunityInventorySnapshot(normalised);
+
+      // Send opportunities to n8n if userId is provided
+      if (userId) {
+        await updateOpportunitiesInN8n(normalised, userId);
+      }
     } catch (error) {
-      console.error('Failed to sync opportunity analytics snapshot', error);
+      console.error('Failed to sync opportunity analytics snapshot or update n8n', error);
     }
   })();
 

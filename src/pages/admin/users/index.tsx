@@ -7,8 +7,7 @@ import {
   query,
   QueryDocumentSnapshot,
   Timestamp
-} from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+} from '../../../lib/firebaseMock';
 import { useAdminCheck } from '../../../hooks/useAdminCheck';
 import useRoleManager, { type UserRole } from '../../../hooks/useRoleManager';
 import UserList from '../../../components/admin/users/UserList';

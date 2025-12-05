@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { signOut, type User } from 'firebase/auth';
 import { ChevronDown, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import Input from '../../ui/Input';
 import Button from '../../ui/Button';
 import { useDarkMode } from '../../../hooks/useDarkMode';
 import { adminNavItems, adminRouteFallbacks } from '../../../pages/admin/admin-navigation';
-import { auth } from '../../../firebase/firebase';
+import { authService } from '../../../lib/auth';
 import { cn } from '../../../lib/cn';
+import type { User } from '@supabase/supabase-js';
 
 interface TopbarProps {
   onToggleSidebar: () => void;
@@ -80,7 +80,7 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar, user }) => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await authService.signOut();
       setMenuOpen(false);
       if (typeof window !== 'undefined') {
         window.location.href = '/';

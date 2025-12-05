@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
-import { db } from '../../../firebase/firebase';
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc } from '../../../lib/firebaseMock';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/Table';
 import Badge from '../../ui/Badge';
 import Select from '../../ui/Select';

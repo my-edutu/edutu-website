@@ -18,6 +18,7 @@ import {
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
+import useTypewriter from '../hooks/useTypewriter';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -115,6 +116,13 @@ const steps = [
 
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  
+  const texts = [
+    'Transform Your Ambitions Into Achievements',
+    'Join Edutu, Your AI-Powered App for Global Opportunities'
+  ];
+  
+  const currentText = useTypewriter(texts);
 
   return (
     <div className={`min-h-screen bg-surface-body text-strong transition-theme ${isDarkMode ? 'dark' : ''}`}>
@@ -156,18 +164,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
       <section className="relative pt-24 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div className="space-y-8">
+            <div className="space-y-8 text-center lg:text-left">
               <div className="space-y-4">
                 <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
-                  Transform Your <span className="text-brand-600">Ambitions</span> Into Achievements
+                  {currentText.includes('Ambitions') ? (
+                    <>
+                      {currentText.substring(0, currentText.indexOf('Ambitions'))}
+                      <span className="text-brand-600">Ambitions</span>
+                      {currentText.substring(currentText.indexOf('Ambitions') + 'Ambitions'.length)}
+                    </>
+                  ) : (
+                    currentText
+                  )}
                 </h1>
-                <p className="text-xl text-soft max-w-lg leading-relaxed">
+                <p className="text-xl text-soft max-w-lg leading-relaxed mx-auto lg:mx-0">
                   Edutu is your AI co-pilot for career growth, offering personalized roadmaps, 
                   smart nudges, and community support to keep you on track.
                 </p>
               </div>
               
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Button 
                   size="lg" 
                   className="px-8 py-4 text-base rounded-xl" 

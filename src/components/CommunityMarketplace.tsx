@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  Bookmark,
   Calendar,
   CheckCircle,
+  ExternalLink,
   Filter,
   Globe,
+  Heart,
+  Link2,
   Plus,
   Search,
+  Sparkles,
   Star,
   Tag,
   Users
@@ -26,9 +31,15 @@ import {
 } from './ui/Dialog';
 import { useToast } from './ui/ToastProvider';
 import { useDarkMode } from '../hooks/useDarkMode';
-import { db } from '../firebase/firebase';
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import type { AppUser } from '../types/user';
+import type { CommunityResource, CommunityRoadmapStage, CommunityStoryStats } from '../types/community';
+import {
+  recordCommunityStoryAdoption,
+  recordCommunityStoryLike,
+  recordCommunityStorySave,
+  fetchCommunityStories,
+  listenToCommunityStories
+} from '../services/communityMarketplaceSupabase';
 
 interface CommunityRoadmap {
   id: string;
@@ -56,6 +67,11 @@ interface CommunityRoadmap {
   type: 'roadmap' | 'marketplace';
   lastUpdatedLabel: string;
   lastUpdatedTimestamp: number;
+  story: string;
+  resources: CommunityResource[];
+  roadmap: CommunityRoadmapStage[];
+  stats: CommunityStoryStats;
+  paymentLink?: string | null;
 }
 
 interface CommunityMarketplaceProps {
@@ -67,6 +83,9 @@ interface CommunityMarketplaceProps {
 interface CreateRoadmapForm {
   title: string;
   summary: string;
+  story: string;
+  roadmapOutline: string;
+  resourceNotes: string;
   category: string;
   duration: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
@@ -77,6 +96,8 @@ interface CreateRoadmapForm {
   coverImage: string;
   creatorTitle: string;
   creatorEmail: string;
+  paymentLink: string;
+  type: 'roadmap' | 'marketplace';
 }
 
 type SortOption = 'Popular' | 'Newest' | 'Highest Rated' | 'Most Used' | 'Free Only';
@@ -88,27 +109,87 @@ const FALLBACK_ROADMAPS: CommunityRoadmap[] = [
     description:
       'How Amara layered leadership, GMAT prep, and scholarship outreach to secure a fully funded Oxford MBA seat.',
     creator: { name: 'Amara Bello', avatar: 'MBA', title: 'Oxford Said MBA Scholar', verified: true },
-    creatorEmail: 'amara@edutu.ai',
-    category: 'Education',
-    duration: '18 months',
-    difficulty: 'Advanced',
+  creatorEmail: 'amara@edutu.ai',
+  category: 'Education',
+  duration: '18 months',
+  difficulty: 'Advanced',
+  rating: 4.9,
+  users: 912,
+  successRate: 62,
+  tags: ['MBA', 'Scholarships', 'Leadership'],
+  achievements: ['Oxford Said offer', 'Clarendon Scholarship', 'GMAT 740'],
+  price: 'Premium',
+  image: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg',
+  featured: true,
+  status: 'approved',
+  type: 'roadmap',
+  lastUpdatedLabel: '3 days ago',
+  lastUpdatedTimestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
+  story:
+    'Follow the exact playbook Amara used to balance leadership impact, GMAT excellence, and scholarship outreach to secure a fully funded Oxford MBA. Each milestone includes templates, outreach scripts, and scorecards.',
+  resources: [
+    {
+      id: 'ox-res-1',
+      title: 'Leadership Impact Tracker Template',
+      description: 'Spreadsheet template to quantify community and professional impact.',
+      url: 'https://example.com/resources/leadership-tracker',
+      type: 'tool',
+      cost: 'free'
+    },
+    {
+      id: 'ox-res-2',
+      title: 'GMAT 740 Study Schedule',
+      url: 'https://example.com/resources/gmat-740-plan',
+      type: 'article',
+      cost: 'free'
+    },
+    {
+      id: 'ox-res-3',
+      title: 'Clarendon Scholarship Outreach Email Pack',
+      url: 'https://example.com/resources/clarendon-outreach',
+      type: 'other',
+      cost: 'paid',
+      notes: 'Included in premium bundle'
+    }
+  ],
+  roadmap: [
+    {
+      id: 'ox-stage-1',
+      title: 'Months 1-3: Clarify your MBA narrative',
+      description: 'Audit achievements, map leadership themes, and shortlist programs.',
+      duration: '12 weeks',
+      tasks: []
+    },
+    {
+      id: 'ox-stage-2',
+      title: 'Months 4-6: GMAT excellence sprint',
+      description: 'Target a 720+ GMAT using Amara’s split-day approach.',
+      duration: '12 weeks',
+      tasks: []
+    },
+    {
+      id: 'ox-stage-3',
+      title: 'Months 7-12: Scholarship outreach & essays',
+      description: 'Run scholarship outreach cadences and polish your essays.',
+      duration: '24 weeks',
+      tasks: []
+    }
+  ],
+  stats: {
     rating: 4.9,
     users: 912,
     successRate: 62,
-    tags: ['MBA', 'Scholarships', 'Leadership'],
-    achievements: ['Oxford Said offer', 'Clarendon Scholarship', 'GMAT 740'],
-    price: 'Premium',
-    image: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg',
-    featured: true,
-    status: 'approved',
-    type: 'roadmap',
-    lastUpdatedLabel: '3 days ago',
-    lastUpdatedTimestamp: Date.now() - 3 * 24 * 60 * 60 * 1000
+    saves: 420,
+    adoptionCount: 318,
+    likes: 198,
+    comments: 64
   },
-  {
-    id: 'sample-data-science',
-    title: 'Pivot to Senior Data Scientist',
-    description: 'Isaac moved from support specialist to senior data science through night classes and ML projects.',
+  paymentLink: 'https://market.edutu.ai/guides/oxford-mba'
+},
+{
+  id: 'sample-data-science',
+  title: 'Pivot to Senior Data Scientist',
+  description: 'Isaac moved from support specialist to senior data science through night classes and ML projects.',
     creator: { name: 'Isaac Mensah', avatar: 'DS', title: 'Senior Data Scientist', verified: true },
     creatorEmail: 'isaac@edutu.ai',
     category: 'Programming',
@@ -118,20 +199,81 @@ const FALLBACK_ROADMAPS: CommunityRoadmap[] = [
     users: 1245,
     successRate: 68,
     tags: ['Python', 'ML', 'Career switch'],
-    achievements: ['Senior DS offer', 'Portfolio of 6 projects', 'Conference talk'],
-    price: 'Free',
-    image: 'https://images.pexels.com/photos/3861958/pexels-photo-3861958.jpeg',
-    featured: false,
-    status: 'approved',
-    type: 'roadmap',
-    lastUpdatedLabel: '1 week ago',
-    lastUpdatedTimestamp: Date.now() - 7 * 24 * 60 * 60 * 1000
-  }
+  achievements: ['Senior DS offer', 'Portfolio of 6 projects', 'Conference talk'],
+  price: 'Free',
+  image: 'https://images.pexels.com/photos/3861958/pexels-photo-3861958.jpeg',
+  featured: false,
+  status: 'approved',
+  type: 'roadmap',
+  lastUpdatedLabel: '1 week ago',
+  lastUpdatedTimestamp: Date.now() - 7 * 24 * 60 * 60 * 1000,
+  story:
+    'Isaac documents how he balanced a support role with night classes, project-based learning, and community showcases to become a senior data scientist. The guide includes weekly checkpoints and portfolio templates.',
+  resources: [
+    {
+      id: 'ds-res-1',
+      title: 'Night School ML Curriculum',
+      url: 'https://example.com/resources/night-ml',
+      type: 'course',
+      cost: 'free'
+    },
+    {
+      id: 'ds-res-2',
+      title: 'Portfolio Project Rubric',
+      url: 'https://example.com/resources/ds-rubric',
+      type: 'tool',
+      cost: 'free'
+    },
+    {
+      id: 'ds-res-3',
+      title: 'Weekly Study Tracker',
+      url: 'https://example.com/resources/study-tracker',
+      type: 'tool',
+      cost: 'free'
+    }
+  ],
+  roadmap: [
+    {
+      id: 'ds-stage-1',
+      title: 'Weeks 1-6: Solidify Python & statistics',
+      description: 'Refresh Python, statistics, and SQL foundations with targeted exercises.',
+      duration: '6 weeks',
+      tasks: []
+    },
+    {
+      id: 'ds-stage-2',
+      title: 'Weeks 7-16: Build portfolio-ready ML projects',
+      description: 'Ship three end-to-end projects that demonstrate experimentation and storytelling.',
+      duration: '10 weeks',
+      tasks: []
+    },
+    {
+      id: 'ds-stage-3',
+      title: 'Weeks 17-24: Showcase & grow community proof',
+      description: 'Publish case studies, present at meetups, and prepare interview artifacts.',
+      duration: '8 weeks',
+      tasks: []
+    }
+  ],
+  stats: {
+    rating: 4.8,
+    users: 1245,
+    successRate: 68,
+    saves: 512,
+    adoptionCount: 402,
+    likes: 276,
+    comments: 81
+  },
+  paymentLink: null
+}
 ];
 
 const CREATE_DEFAULTS: CreateRoadmapForm = {
   title: '',
   summary: '',
+  story: '',
+  roadmapOutline: '',
+  resourceNotes: '',
   category: 'Programming',
   duration: '6 months',
   difficulty: 'Intermediate',
@@ -141,7 +283,9 @@ const CREATE_DEFAULTS: CreateRoadmapForm = {
   outcomes: '',
   coverImage: '',
   creatorTitle: '',
-  creatorEmail: ''
+  creatorEmail: '',
+  paymentLink: '',
+  type: 'roadmap'
 };
 
 const normaliseDifficulty = (value: unknown): 'Beginner' | 'Intermediate' | 'Advanced' => {
@@ -224,9 +368,321 @@ const ensureImage = (category: string, provided?: string): string => {
   return 'https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg';
 };
 
+const createLocalId = (prefix: string, index: number) => `${prefix}-${index}-${Math.random().toString(36).slice(2, 10)}`;
+
+const normaliseResourceList = (value: unknown): CommunityResource[] => {
+  if (!value) {
+    return [];
+  }
+
+  const rawList = Array.isArray(value) ? value : typeof value === 'string' ? value.split('\n') : [value];
+
+  return rawList
+    .map((entry, index) => {
+      if (typeof entry === 'string') {
+        const trimmed = entry.trim();
+        if (!trimmed) {
+          return null;
+        }
+        return {
+          id: createLocalId('resource', index),
+          title: trimmed,
+          description: undefined,
+          url: undefined,
+          type: undefined,
+          cost: undefined,
+          notes: undefined
+        } as CommunityResource;
+      }
+
+      if (entry && typeof entry === 'object') {
+        const resource = entry as Record<string, unknown>;
+        const title =
+          typeof resource.title === 'string' && resource.title.trim().length > 0
+            ? resource.title.trim()
+            : typeof resource.name === 'string'
+              ? resource.name.trim()
+              : '';
+        if (!title) {
+          return null;
+        }
+
+        const url =
+          typeof resource.url === 'string' && resource.url.trim().length > 0
+            ? resource.url.trim()
+            : typeof resource.link === 'string'
+              ? resource.link.trim()
+              : undefined;
+
+        const description =
+          typeof resource.description === 'string' && resource.description.trim().length > 0
+            ? resource.description.trim()
+            : undefined;
+
+        const provider =
+          typeof resource.provider === 'string' && resource.provider.trim().length > 0
+            ? resource.provider.trim()
+            : undefined;
+
+        const notes =
+          typeof resource.notes === 'string' && resource.notes.trim().length > 0
+            ? resource.notes.trim()
+            : undefined;
+
+        const type =
+          typeof resource.type === 'string' && resource.type.trim().length > 0
+            ? (resource.type.trim() as CommunityResource['type'])
+            : undefined;
+
+        const cost =
+          typeof resource.cost === 'string' && resource.cost.trim().length > 0
+            ? (resource.cost.trim() === 'paid' ? 'paid' : 'free')
+            : undefined;
+
+        return {
+          id:
+            (typeof resource.id === 'string' && resource.id.trim().length > 0
+              ? resource.id.trim()
+              : createLocalId('resource', index)),
+          title,
+          description,
+          url,
+          provider,
+          type,
+          cost,
+          notes
+        };
+      }
+
+      return null;
+    })
+    .filter((item): item is CommunityResource => Boolean(item));
+};
+
+const normaliseRoadmapStages = (value: unknown): CommunityRoadmapStage[] => {
+  if (!value) {
+    return [];
+  }
+
+  const serialiseStringStage = (raw: string, index: number): CommunityRoadmapStage => {
+    const trimmed = raw.trim();
+    const [heading, ...rest] = trimmed.split(/[-:]/);
+    const description = rest.join('-').trim();
+    return {
+      id: createLocalId('stage', index),
+      title: heading.trim() || `Stage ${index + 1}`,
+      description: description || undefined,
+      tasks: []
+    };
+  };
+
+  if (typeof value === 'string') {
+    const segments = value.split(/\n{2,}|\r\n{2,}/).map((segment) => segment.trim());
+    return segments.filter(Boolean).map((segment, index) => serialiseStringStage(segment, index));
+  }
+
+  const rawList = Array.isArray(value) ? value : [value];
+
+  return rawList
+    .map((entry, index) => {
+      if (typeof entry === 'string') {
+        return serialiseStringStage(entry, index);
+      }
+
+      if (entry && typeof entry === 'object') {
+        const stage = entry as Record<string, unknown>;
+        const title =
+          typeof stage.title === 'string' && stage.title.trim().length > 0
+            ? stage.title.trim()
+            : typeof stage.name === 'string'
+              ? stage.name.trim()
+              : '';
+
+        const description =
+          typeof stage.description === 'string' && stage.description.trim().length > 0
+            ? stage.description.trim()
+            : typeof stage.summary === 'string'
+              ? stage.summary.trim()
+              : undefined;
+
+        const milestone =
+          typeof stage.milestone === 'string' && stage.milestone.trim().length > 0
+            ? stage.milestone.trim()
+            : undefined;
+
+        const duration =
+          typeof stage.duration === 'string' && stage.duration.trim().length > 0
+            ? stage.duration.trim()
+            : undefined;
+
+        const tasksRaw = stage.tasks;
+        const tasks =
+          Array.isArray(tasksRaw) && tasksRaw.length > 0
+            ? tasksRaw
+                .map((task, taskIndex) => {
+                  if (task && typeof task === 'object') {
+                    const taskRecord = task as Record<string, unknown>;
+                    const taskTitle =
+                      typeof taskRecord.title === 'string' && taskRecord.title.trim().length > 0
+                        ? taskRecord.title.trim()
+                        : '';
+                    if (!taskTitle) {
+                      return null;
+                    }
+
+                    const taskDescription =
+                      typeof taskRecord.description === 'string' && taskRecord.description.trim().length > 0
+                        ? taskRecord.description.trim()
+                        : undefined;
+
+                    return {
+                      id:
+                        typeof taskRecord.id === 'string' && taskRecord.id.trim().length > 0
+                          ? taskRecord.id.trim()
+                          : createLocalId(`task-${index}`, taskIndex),
+                      title: taskTitle,
+                      description: taskDescription,
+                      duration:
+                        typeof taskRecord.duration === 'string' && taskRecord.duration.trim().length > 0
+                          ? taskRecord.duration.trim()
+                          : undefined,
+                      resourceIds: Array.isArray(taskRecord.resourceIds)
+                        ? (taskRecord.resourceIds.filter((id): id is string => typeof id === 'string') as string[])
+                        : undefined,
+                      outcome:
+                        typeof taskRecord.outcome === 'string' && taskRecord.outcome.trim().length > 0
+                          ? taskRecord.outcome.trim()
+                          : undefined
+                    };
+                  }
+                  if (typeof task === 'string' && task.trim().length > 0) {
+                    return {
+                      id: createLocalId(`task-${index}`, taskIndex),
+                      title: task.trim(),
+                      description: undefined
+                    };
+                  }
+                  return null;
+                })
+                .filter((task): task is CommunityRoadmapStage['tasks'][number] => Boolean(task))
+            : [];
+
+        return {
+          id:
+            typeof stage.id === 'string' && stage.id.trim().length > 0
+              ? stage.id.trim()
+              : createLocalId('stage', index),
+          title: title || `Stage ${index + 1}`,
+          description,
+          duration,
+          milestone,
+          tasks,
+          resourceIds: Array.isArray(stage.resourceIds)
+            ? (stage.resourceIds.filter((id): id is string => typeof id === 'string') as string[])
+            : undefined,
+          checkpoint:
+            typeof stage.checkpoint === 'string' && stage.checkpoint.trim().length > 0
+              ? stage.checkpoint.trim()
+              : undefined
+        };
+      }
+
+      return null;
+    })
+    .filter((stage): stage is CommunityRoadmapStage => Boolean(stage));
+};
+
+const deriveStatsFromPayload = (
+  payload: Record<string, unknown>,
+  defaults: Pick<CommunityStoryStats, 'rating' | 'users' | 'successRate'>
+): CommunityStoryStats => {
+  const statsPayload = payload.stats as Record<string, unknown> | undefined;
+  const read = (key: string, fallback: number) => {
+    if (statsPayload && key in statsPayload) {
+      return toNumber(statsPayload[key], fallback);
+    }
+    if (key in payload) {
+      return toNumber(payload[key], fallback);
+    }
+    return fallback;
+  };
+
+  const rating = Math.min(Math.max(read('rating', defaults.rating), 0), 5);
+  const users = Math.max(0, Math.round(read('users', defaults.users)));
+  const successRate = Math.min(Math.max(read('successRate', defaults.successRate), 1), 100);
+
+  return {
+    rating,
+    users,
+    successRate,
+    saves: Math.max(0, Math.round(read('saves', 0))),
+    adoptionCount: Math.max(0, Math.round(read('adoptionCount', defaults.users))),
+    likes: Math.max(0, Math.round(read('likes', 0))),
+    comments: Math.max(0, Math.round(read('comments', 0)))
+  };
+};
+
 const mapListingToRoadmap = (payload: Record<string, unknown>, id: string): CommunityRoadmap => {
   const category = typeof payload.category === 'string' ? payload.category : 'Community';
   const updatedAt = parseDate(payload.updatedAt ?? payload.createdAt);
+
+  const creatorRecord =
+    payload.creator && typeof payload.creator === 'object' ? (payload.creator as Record<string, unknown>) : null;
+  const creatorName =
+    typeof creatorRecord?.name === 'string' && creatorRecord.name.trim().length > 0
+      ? creatorRecord.name.trim()
+      : typeof payload.creatorName === 'string'
+        ? payload.creatorName
+        : 'Community creator';
+  const creatorAvatar =
+    typeof creatorRecord?.avatar === 'string' && creatorRecord.avatar.trim().length > 0
+      ? creatorRecord.avatar.trim()
+      : typeof payload.creatorAvatar === 'string' && payload.creatorAvatar.trim().length > 0
+        ? payload.creatorAvatar.trim()
+        : 'CC';
+  const creatorTitle =
+    typeof creatorRecord?.title === 'string' && creatorRecord.title.trim().length > 0
+      ? creatorRecord.title.trim()
+      : typeof payload.creatorTitle === 'string'
+        ? payload.creatorTitle
+        : '';
+  const creatorEmail =
+    typeof creatorRecord?.email === 'string' && creatorRecord.email.trim().length > 0
+      ? creatorRecord.email.trim()
+      : typeof payload.creatorEmail === 'string'
+        ? payload.creatorEmail.trim()
+        : undefined;
+  const creatorVerified =
+    typeof creatorRecord?.verified === 'boolean' ? creatorRecord.verified : Boolean(payload.creatorVerified);
+
+  const rawRating = Math.max(4.2, toNumber(payload.rating, 4.7));
+  const rawUsers = toNumber(payload.users ?? payload.submissions, 0);
+  const rawSuccessRate = Math.min(Math.max(toNumber(payload.successRate, 60), 1), 100);
+  const stats = deriveStatsFromPayload(payload, {
+    rating: rawRating,
+    users: rawUsers,
+    successRate: rawSuccessRate
+  });
+
+  const story =
+    typeof payload.story === 'string' && payload.story.trim().length > 0
+      ? payload.story.trim()
+      : typeof payload.longDescription === 'string' && payload.longDescription.trim().length > 0
+        ? payload.longDescription.trim()
+        : typeof payload.description === 'string'
+          ? payload.description
+          : typeof payload.summary === 'string'
+            ? payload.summary
+            : 'Community submission awaiting more details.';
+
+  const paymentLink =
+    typeof payload.paymentLink === 'string' && payload.paymentLink.trim().length > 0
+      ? payload.paymentLink.trim()
+      : typeof payload.checkoutUrl === 'string' && payload.checkoutUrl.trim().length > 0
+        ? payload.checkoutUrl.trim()
+        : typeof payload.purchaseLink === 'string' && payload.purchaseLink.trim().length > 0
+          ? payload.purchaseLink.trim()
+          : undefined;
 
   return {
     id,
@@ -238,30 +694,39 @@ const mapListingToRoadmap = (payload: Record<string, unknown>, id: string): Comm
           ? payload.summary
           : 'Community submission awaiting more details.',
     creator: {
-      name: typeof payload.creatorName === 'string' ? payload.creatorName : 'Community creator',
-      avatar:
-        typeof payload.creatorAvatar === 'string' && payload.creatorAvatar.trim().length > 0
-          ? payload.creatorAvatar.trim()
-          : 'CC',
-      title: typeof payload.creatorTitle === 'string' ? payload.creatorTitle : '',
-      verified: Boolean(payload.creatorVerified)
+      name: creatorName,
+      avatar: creatorAvatar,
+      title: creatorTitle,
+      verified: creatorVerified
     },
-    creatorEmail: typeof payload.creatorEmail === 'string' ? payload.creatorEmail : undefined,
+    creatorEmail,
     category,
     duration: typeof payload.duration === 'string' ? payload.duration : 'Flexible',
     difficulty: normaliseDifficulty(payload.difficulty),
-    rating: Math.max(4.2, toNumber(payload.rating, 4.7)),
-    users: toNumber(payload.users ?? payload.submissions, 0),
-    successRate: Math.min(Math.max(toNumber(payload.successRate, 60), 1), 100),
+    rating: stats.rating,
+    users: stats.users,
+    successRate: stats.successRate,
     tags: toStringList(payload.tags),
     achievements: toStringList(payload.outcomes ?? payload.achievements),
     price: payload.priceType === 'premium' ? 'Premium' : 'Free',
-    image: ensureImage(category, typeof payload.coverImage === 'string' ? payload.coverImage : (typeof payload.image === 'string' ? payload.image : undefined)),
+    image: ensureImage(
+      category,
+      typeof payload.coverImage === 'string'
+        ? payload.coverImage
+        : typeof payload.image === 'string'
+          ? payload.image
+          : undefined
+    ),
     featured: Boolean(payload.featured),
     status: payload.status === 'approved' ? 'approved' : payload.status === 'hidden' ? 'hidden' : 'pending',
     type: payload.type === 'marketplace' ? 'marketplace' : 'roadmap',
     lastUpdatedLabel: updatedAt.toLocaleDateString(),
-    lastUpdatedTimestamp: updatedAt.getTime()
+    lastUpdatedTimestamp: updatedAt.getTime(),
+    story,
+    resources: normaliseResourceList(payload.resources),
+    roadmap: normaliseRoadmapStages(payload.roadmap),
+    stats,
+    paymentLink
   };
 };
 
@@ -274,13 +739,22 @@ const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onBack, onR
   const [ hasRealtimeData, setHasRealtimeData ] = useState(false);
   const [ searchTerm, setSearchTerm ] = useState('');
   const [ categoryFilter, setCategoryFilter ] = useState<string>('All');
+  const [ typeFilter, setTypeFilter ] = useState<'all' | 'roadmap' | 'marketplace'>('all');
+  const [ priceFilter, setPriceFilter ] = useState<'all' | 'Free' | 'Premium'>('all');
+  const [ difficultyFilter, setDifficultyFilter ] = useState<'all' | 'Beginner' | 'Intermediate' | 'Advanced'>('all');
+  const [ tagFilter, setTagFilter ] = useState<string>('All');
+  const [ verifiedOnly, setVerifiedOnly ] = useState(false);
   const [ sortOption, setSortOption ] = useState<SortOption>('Popular');
   const [ showFilters, setShowFilters ] = useState(false);
   const [ selectedRoadmap, setSelectedRoadmap ] = useState<CommunityRoadmap | null>(null);
+  const [ detailOpen, setDetailOpen ] = useState(false);
   const [ createOpen, setCreateOpen ] = useState(false);
   const [ submitting, setSubmitting ] = useState(false);
   const [ submissionMessage, setSubmissionMessage ] = useState<string | null>(null);
   const [ formState, setFormState ] = useState<CreateRoadmapForm>({ ...CREATE_DEFAULTS });
+  const [ likeLoading, setLikeLoading ] = useState(false);
+  const [ saveLoading, setSaveLoading ] = useState(false);
+  const [ adoptLoading, setAdoptLoading ] = useState(false);
 
   useEffect(() => {
     if (!db) {
