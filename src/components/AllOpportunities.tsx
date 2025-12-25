@@ -1,30 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Search, Star, Calendar, MapPin, Filter } from 'lucide-react';
-import Button from './ui/Button';
-import Card from './ui/Card';
+import React, { useMemo, useState } from 'react';
+import {
+  Search,
+  Filter,
+  RefreshCw,
+  Sparkles,
+  Globe,
+  ChevronRight,
+} from 'lucide-react';
+
 import { useDarkMode } from '../hooks/useDarkMode';
 import { usePersonalizedOpportunities } from '../hooks/usePersonalizedOpportunities';
+import PageHeader from './PageHeader';
 import type { Opportunity } from '../types/opportunity';
 
 interface AllOpportunitiesProps {
   onBack: () => void;
   onSelectOpportunity: (opportunity: Opportunity) => void;
 }
-
-const LOADING_PLACEHOLDERS = 4;
-
-const getDifficultyColor = (difficulty?: string | null) => {
-  switch (difficulty) {
-    case 'Easy':
-      return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
-    case 'Medium':
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
-    case 'Hard':
-      return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
-    default:
-      return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
-  }
-};
 
 const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpportunity }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,13 +26,9 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
   const {
     data: personalizedOpportunities,
     loading,
-    error,
-    refresh,
-    userPreferences,
-    updateUserPreferences
+    refresh
   } = usePersonalizedOpportunities();
 
-  // Extract the opportunities from the personalized data
   const opportunities = useMemo(() =>
     personalizedOpportunities.map(item => item.opportunity),
     [personalizedOpportunities]
@@ -56,299 +44,173 @@ const AllOpportunities: React.FC<AllOpportunitiesProps> = ({ onBack, onSelectOpp
     return ['All', ...Array.from(dynamic).sort()];
   }, [opportunities]);
 
-  useEffect(() => {
-    if (selectedCategory !== 'All' && !categories.includes(selectedCategory)) {
-      setSelectedCategory('All');
-    }
-  }, [categories, selectedCategory]);
-
   const filteredOpportunities = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-
-    return personalizedOpportunities.filter(({ opportunity, matchScore }) => {
-      if (selectedCategory !== 'All' && opportunity.category !== selectedCategory) {
-        return false;
-      }
-
-      if (!term) {
-        return true;
-      }
-
-      const haystack = [
-        opportunity.title,
-        opportunity.organization,
-        opportunity.description,
-        opportunity.category,
-        opportunity.location
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
+    return personalizedOpportunities.filter(({ opportunity }) => {
+      if (selectedCategory !== 'All' && opportunity.category !== selectedCategory) return false;
+      if (!term) return true;
+      const haystack = [opportunity.title, opportunity.organization, opportunity.description, opportunity.location]
+        .filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(term);
     });
   }, [personalizedOpportunities, searchTerm, selectedCategory]);
 
-  const headerSubtitle = useMemo(() => {
-    if (loading) {
-      return 'Loading personalized opportunities...';
-    }
-
-    if (error) {
-      return 'We ran into a problem fetching opportunities';
-    }
-
-    return `${filteredOpportunities.length} personalized opportunities available`;
-  }, [error, filteredOpportunities.length, loading]);
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBack = () => {
-    scrollToTop();
-    onBack();
-  };
-
-  const showEmptyState = !loading && !error && filteredOpportunities.length === 0;
-
-  // Function to handle preference updates
-  const handleUpdatePreferences = () => {
-    if (userPreferences) {
-      // Example: update with temporary values, in real app these would come from UI
-      updateUserPreferences({
-        interests: ['Technology', 'Leadership', 'Entrepreneurship'],
-        preferredCategories: ['Tech', 'Leadership'],
-        experienceLevel: 'intermediate'
-      });
-    }
-  };
-
   return (
-    <div className={`min-h-screen bg-white dark:bg-gray-900 animate-fade-in ${isDarkMode ? 'dark' : ''}`}>
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="p-4">
-          <div className="flex items-center gap-3 mb-4">
-            <Button variant="secondary" onClick={handleBack} className="p-2">
-              <ArrowLeft size={20} />
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">Personalized Opportunities</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{headerSubtitle}</p>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-950 text-white' : 'bg-slate-50 text-slate-900'} font-body transition-colors duration-500`}>
+      {/* Background Mesh Gradient */}
+      <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-10 mesh-gradient" />
+
+      {/* Page Header */}
+      <PageHeader
+        title="Explore Opportunities"
+        subtitle={loading ? 'Curating your matches...' : `${filteredOpportunities.length} personalized matches`}
+        onBack={onBack}
+        rightContent={
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className={`p-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/20 transition-all ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title="Refresh Feed"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+        }
+      />
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24 space-y-6 relative z-10">
+
+        {/* Search & Filter Bar */}
+        <div className="sticky top-4 z-20 space-y-3">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search..."
+                className="w-full pl-11 pr-4 py-3 rounded-2xl border-none bg-white dark:bg-gray-900 text-slate-900 dark:text-white placeholder-slate-500 shadow-sm focus:ring-2 focus:ring-brand-500 transition-all font-medium text-sm"
+              />
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={refresh}
-              disabled={loading}
-              className="shrink-0"
-            >
-              Refresh
-            </Button>
-          </div>
-
-          <div className="relative mb-4">
-            <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search opportunities..."
-              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-            />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                  selectedCategory === category
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
-                showFilters
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+              className={`p-3 rounded-2xl transition-all shadow-sm border ${showFilters
+                ? 'bg-brand-500 text-white border-brand-500'
+                : 'bg-white dark:bg-gray-900 text-slate-600 dark:text-slate-400 border-transparent hover:border-slate-200 dark:hover:border-white/10'
+                }`}
             >
-              <Filter size={16} /> Filters
+              <Filter size={20} />
             </button>
           </div>
 
-          {showFilters && userPreferences && (
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600">
-              <h3 className="font-medium text-gray-800 dark:text-white mb-2">Your Preferences</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Interests</label>
-                  <input
-                    type="text"
-                    value={userPreferences.interests.join(', ')}
-                    onChange={(e) => updateUserPreferences({ interests: e.target.value.split(',').map(i => i.trim()) })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
-                    placeholder="e.g., Technology, Leadership"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Preferred Categories</label>
-                  <input
-                    type="text"
-                    value={userPreferences.preferredCategories.join(', ')}
-                    onChange={(e) => updateUserPreferences({ preferredCategories: e.target.value.split(',').map(c => c.trim()) })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
-                    placeholder="e.g., Tech, Scholarships"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Experience Level</label>
-                  <select
-                    value={userPreferences.experienceLevel}
-                    onChange={(e) => updateUserPreferences({ experienceLevel: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={userPreferences.location || ''}
-                    onChange={(e) => updateUserPreferences({ location: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-white"
-                    placeholder="Your location"
-                  />
-                </div>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <Button variant="secondary" size="sm" onClick={handleUpdatePreferences}>
-                  Apply Preferences
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <Card className="mt-4 border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm">Couldn&apos;t refresh the latest opportunities. Please try again.</p>
-                <Button variant="secondary" size="sm" onClick={refresh}>
-                  Try again
-                </Button>
-              </div>
-            </Card>
-          )}
+          {/* Quick Categories Bar */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap border ${selectedCategory === cat
+                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 border-brand-500/20'
+                  : 'bg-white dark:bg-gray-900 text-slate-500 dark:text-slate-400 border-transparent hover:bg-slate-50 dark:hover:bg-white/5'
+                  }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="p-4 space-y-4">
-        {loading &&
-          Array.from({ length: LOADING_PLACEHOLDERS }).map((_, index) => (
-            <Card
-              key={`loading-${index}`}
-              className="border-subtle bg-surface-layer animate-pulse"
-            >
-              <div className="flex gap-4">
-                <div className="h-16 w-16 rounded-2xl bg-gray-200 dark:bg-gray-700" />
-                <div className="flex-1 space-y-3">
-                  <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-                  <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
-                  <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-700" />
-                  <div className="flex gap-2">
-                    <div className="h-6 w-24 rounded-full bg-gray-200 dark:bg-gray-700" />
-                    <div className="h-6 w-20 rounded-full bg-gray-200 dark:bg-gray-700" />
-                  </div>
+        {/* Opportunities List */}
+        <div className="space-y-6 pb-12">
+          {loading ? (
+            <div className="space-y-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="premium-card p-6 h-48 animate-pulse border-none bg-white/50 dark:bg-gray-900/50" />
+              ))}
+            </div>
+          ) : filteredOpportunities.length > 0 ? (
+            filteredOpportunities.map(({ opportunity, matchScore }, index) => (
+              <div
+                key={opportunity.id}
+                onClick={() => onSelectOpportunity(opportunity)}
+                className="premium-card group relative p-0 flex flex-col md:flex-row gap-0 cursor-pointer overflow-hidden hover:scale-[1.01] transition-all duration-500 border-none bg-white dark:bg-gray-900 shadow-xl shadow-slate-200/40 dark:shadow-none animate-slide-up"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                {/* Match Score Badge - Modern Floating Style */}
+                <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-lg border border-brand-500/20 group-hover:scale-110 transition-transform">
+                  <Sparkles size={14} className="text-brand-500 animate-pulse" />
+                  <span className="text-xs font-bold text-brand-600 dark:text-brand-400">{Math.round(matchScore)}% Match</span>
                 </div>
-              </div>
-            </Card>
-          ))}
 
-        {!loading &&
-          filteredOpportunities.map(({ opportunity, matchScore }, index) => (
-            <Card
-              key={opportunity.id}
-              className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] animate-slide-up"
-              style={{ animationDelay: `${index * 50}ms` }}
-              onClick={() => onSelectOpportunity(opportunity)}
-            >
-              <div className="flex gap-4">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-gray-700">
+                {/* Left Side: Image Container */}
+                <div className="w-full md:w-64 h-48 md:h-auto overflow-hidden relative shrink-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-10" />
                   {opportunity.image ? (
-                    <img src={opportunity.image} alt={opportunity.title} className="h-full w-full object-cover" />
+                    <img src={opportunity.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400">
-                      No image
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 text-slate-300 gap-3">
+                      <Globe size={48} opacity={0.3} className="group-hover:rotate-12 transition-transform duration-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Personalized</span>
                     </div>
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-800 dark:text-white line-clamp-2 mb-1">
-                        {opportunity.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{opportunity.organization}</p>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      <Star size={14} className="text-yellow-500" />
-                      <span className={`text-sm font-medium ${
-                        matchScore >= 70 ? 'text-green-600 dark:text-green-400' :
-                        matchScore >= 40 ? 'text-yellow-600 dark:text-yellow-400' :
-                        'text-red-600 dark:text-red-400'
-                      }`}>
-                        {Math.round(matchScore)}% match
+
+                {/* Right Side: Content */}
+                <div className="flex-1 p-6 md:p-8 flex flex-col justify-between relative">
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="px-2.5 py-1 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 text-[10px] font-black uppercase tracking-widest">
+                        {opportunity.category}
+                      </span>
+                      <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700 mx-1" />
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${opportunity.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-600' :
+                        opportunity.difficulty === 'Hard' ? 'bg-rose-500/10 text-rose-600' :
+                          'bg-amber-500/10 text-amber-600'
+                        }`}>
+                        {opportunity.difficulty || 'Intermediate'}
                       </span>
                     </div>
+
+                    <h3 className="text-2xl font-display font-bold mb-3 group-hover:text-brand-500 transition-colors leading-tight">
+                      {opportunity.title}
+                    </h3>
+
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6 line-clamp-2 leading-relaxed max-w-2xl">
+                      {opportunity.description || "A personalized opportunity curated by Edutu AI to help you achieve your career goals. This match aligns with your background and interests."}
+                    </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    <div className="flex items-center gap-1">
-                      <Calendar size={12} />
-                      <span>{opportunity.deadline || 'No deadline listed'}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-6">
+                    <div className="flex flex-wrap items-center gap-6 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-2 w-2 rounded-full bg-brand-500" />
+                        <span className="group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">{opportunity.deadline || 'Ongoing'}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-2 w-2 rounded-full bg-indigo-500" />
+                        <span className="group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">{opportunity.location || 'Remote'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin size={12} />
-                      <span>{opportunity.location}</span>
-                    </div>
-                    {opportunity.successRate && <span>Success rate {opportunity.successRate}</span>}
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs border ${getDifficultyColor(opportunity.difficulty)}`}
-                      >
-                        {opportunity.difficulty ?? 'Medium'}
-                      </span>
-                      {opportunity.applicants && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{opportunity.applicants} applicants</span>
-                      )}
+                    <div className="flex items-center gap-2 text-brand-500 font-bold text-sm">
+                      <span>Explore Journey</span>
+                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
                     </div>
-                    <span className="text-xs text-primary font-medium">{opportunity.category}</span>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
 
-        {showEmptyState && (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">:(</div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">No opportunities found</h3>
-            <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filter criteria.</p>
-          </div>
-        )}
+                {/* Decorative Elements */}
+                <div className="absolute -bottom-10 -right-10 h-32 w-32 bg-brand-500/5 rounded-full blur-3xl group-hover:bg-brand-500/10 transition-colors" />
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-20 premium-card bg-transparent border-dashed">
+              <Globe size={48} className="mx-auto text-slate-300 mb-4 opacity-50" />
+              <h3 className="text-xl font-display font-bold mb-2">Refining Feed...</h3>
+              <p className="text-slate-500 font-medium">Try adjusting your filters to see more results.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

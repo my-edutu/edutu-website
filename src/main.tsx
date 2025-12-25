@@ -1,25 +1,54 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+
+// Initialize i18n before rendering
+import './i18n';
+
 import { GoalsProvider } from './hooks/useGoals';
 import { AnalyticsProvider } from './hooks/useAnalytics';
 import { NotificationsProvider } from './hooks/useNotifications';
+import { ThemeProvider } from './hooks/useTheme';
 import App from './App.tsx';
-import AdminRoot from './admin/AdminRoot.tsx';
 import { ToastProvider } from './components/ui/ToastProvider';
+import ErrorBoundary from './components/ErrorBoundary';
 
-const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
 
-createRoot(document.getElementById('root')!).render(
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
+
+// Loading fallback for Suspense
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-[#0c0f1a] flex items-center justify-center">
+    <div className="text-center">
+      <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-white/60">Loading...</p>
+    </div>
+  </div>
+);
+
+const root = createRoot(document.getElementById('root')!);
+
+root.render(
   <StrictMode>
-    <ToastProvider>
-      <NotificationsProvider>
-        <GoalsProvider>
-          <AnalyticsProvider>
-            {isAdminRoute ? <AdminRoot /> : <App />}
-          </AnalyticsProvider>
-        </GoalsProvider>
-      </NotificationsProvider>
-    </ToastProvider>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingScreen />}>
+        <BrowserRouter>
+          <ToastProvider>
+            <ThemeProvider>
+              <NotificationsProvider>
+                <AuthProvider initialUser={null}>
+                  <GoalsProvider>
+                    <AnalyticsProvider>
+                      <App />
+                    </AnalyticsProvider>
+                  </GoalsProvider>
+                </AuthProvider>
+              </NotificationsProvider>
+            </ThemeProvider>
+          </ToastProvider>
+        </BrowserRouter>
+      </Suspense>
+    </ErrorBoundary>
   </StrictMode>
 );

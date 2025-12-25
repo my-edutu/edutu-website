@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowLeft, User, Mail, Phone, MapPin, Calendar, Save, Camera } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Calendar, Save, Camera, Loader2 } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
-import { usePersistentState } from '../hooks/usePersistentState';
 import { authService, type Profile } from '../lib/auth';
+import profileImageService from '../services/profileImage';
 import type { AppUser } from '../types/user';
 import type { OnboardingProfileData } from '../types/onboarding';
 
@@ -47,13 +47,14 @@ const DEFAULT_FORM: ProfileFormData = {
 
 const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, onBack }) => {
   const { isDarkMode } = useDarkMode();
-  const [formData, setFormData] = usePersistentState<ProfileFormData>('profile.formData', {
+  const [formData, setFormData] = useState<ProfileFormData>({
     ...DEFAULT_FORM,
     name: user?.name || DEFAULT_FORM.name,
     age: user?.age !== undefined ? user.age.toString() : DEFAULT_FORM.age
   });
-  const [profileImage, setProfileImage] = usePersistentState<string | null>('profile.profileImage', null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,16 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
           age: user.age !== undefined ? user.age.toString() : '',
           courseOfStudy: user.courseOfStudy || ''
         }));
+
+        // Load profile image from Supabase
+        try {
+          const avatarUrl = await profileImageService.getProfileImageUrl();
+          if (avatarUrl) {
+            setProfileImage(avatarUrl);
+          }
+        } catch (error) {
+          console.error('Failed to load profile image:', error);
+        }
 
         // Load more detailed profile data from the database
         try {
@@ -115,19 +126,19 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
 
   const handleFieldChange =
     (field: keyof ProfileFormData) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const value = event.target.value;
-      setFormData((prev) => ({
-        ...prev,
-        [field]: value
-      }));
-    };
+      (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const value = event.target.value;
+        setFormData((prev) => ({
+          ...prev,
+          [field]: value
+        }));
+      };
 
   const triggerImagePicker = () => {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -138,16 +149,26 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setProfileImage(reader.result as string);
-      setSaveMessage('Profile photo updated.');
+    setIsUploadingImage(true);
+    setSaveMessage('Uploading profile photo...');
+
+    try {
+      // Upload to Supabase Storage with resizing
+      const result = await profileImageService.uploadResizedProfileImage(file);
+
+      if (result.success && result.url) {
+        setProfileImage(result.url);
+        setSaveMessage('Profile photo updated successfully!');
+      } else {
+        setSaveMessage(result.error || 'Failed to upload profile photo.');
+      }
+    } catch (error) {
+      console.error('Failed to upload profile image:', error);
+      setSaveMessage('Something went wrong while uploading. Please try again.');
+    } finally {
+      setIsUploadingImage(false);
       setTimeout(() => setSaveMessage(null), 3500);
-    };
-    reader.onerror = () => {
-      setSaveMessage('Something went wrong while reading the file. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleSave = async (event?: FormEvent<HTMLFormElement> | ReactMouseEvent<HTMLButtonElement>) => {
@@ -288,17 +309,23 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ user, setUser, on
         <Card className="dark:bg-gray-800 dark:border-gray-700">
           <div className="text-center">
             <div className="relative inline-block mb-4">
-              <div className="w-24 h-24 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto overflow-hidden">
+              <div className="w-24 h-24 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto overflow-hidden relative">
                 {profileImage ? (
                   <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <User size={40} className="text-white" />
                 )}
+                {isUploadingImage && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <Loader2 size={24} className="text-white animate-spin" />
+                  </div>
+                )}
               </div>
               <button
                 type="button"
                 onClick={triggerImagePicker}
-                className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition-colors"
+                disabled={isUploadingImage}
+                className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
               >
                 <Camera size={16} />
               </button>

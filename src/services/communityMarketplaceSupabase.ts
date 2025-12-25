@@ -1,4 +1,4 @@
-// Mock service to replace Firebase functionality with Supabase
+// Service to handle community marketplace functionality with Supabase
 import { supabase } from '../lib/supabaseClient';
 import type {
   CommunityModeratorNote,
@@ -13,97 +13,103 @@ import type {
   CommunityStoryUpdateInput
 } from '../types/community';
 
-// Mock data for demonstration purposes
-const mockStories: CommunityStory[] = [
-  {
-    id: '1',
-    title: 'Getting Started with Web Development',
-    summary: 'Learn the fundamentals of HTML, CSS, and JavaScript',
-    story: 'A comprehensive guide for beginners',
-    category: 'Technology',
-    duration: '3 months',
-    difficulty: 'Beginner',
-    price: 'Free',
-    successRate: 85,
-    image: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg',
+/**
+ * Mapping helper for community posts (Roadmaps)
+ */
+function mapPostToStory(post: any): CommunityStory {
+  const metadata = post.metadata || {};
+  return {
+    id: post.id,
+    title: post.title,
+    summary: metadata.summary || post.content.substring(0, 150) + '...',
+    story: post.content,
+    category: metadata.category || 'General',
+    duration: metadata.duration,
+    difficulty: metadata.difficulty || 'Intermediate',
+    price: metadata.price || 'Free',
+    successRate: metadata.successRate || 0,
+    image: metadata.image || '',
     creator: {
-      name: 'Jane Smith',
-      title: 'Senior Frontend Developer',
-      avatar: undefined,
-      email: undefined,
-      verified: true
+      name: metadata.creator_name || 'Community Member',
+      title: metadata.creator_title || '',
+      avatar: metadata.creator_avatar || '',
+      email: metadata.creator_email || '',
+      verified: metadata.creator_verified || false
     },
-    tags: ['Web Development', 'HTML', 'CSS'],
-    outcomes: ['Build a portfolio website', 'Understand responsive design'],
-    resources: [],
-    roadmap: [],
-    status: 'approved',
-    type: 'roadmap',
-    featured: true,
-    featuredRank: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    approvedAt: new Date().toISOString(),
-    approvedBy: 'admin',
-    moderatorNotes: [],
+    tags: post.tags || [],
+    outcomes: metadata.outcomes || [],
+    resources: metadata.resources || [],
+    roadmap: metadata.roadmap || [],
+    status: (post.visibility === 'public' ? 'approved' : post.visibility === 'admins' ? 'pending' : 'hidden') as CommunityStoryStatus,
+    type: post.type as CommunityStoryType,
+    featured: metadata.featured || false,
+    featuredRank: metadata.featuredRank || null,
+    createdAt: post.created_at,
+    updatedAt: post.updated_at,
+    approvedAt: metadata.approved_at,
+    approvedBy: metadata.approved_by,
+    moderatorNotes: metadata.moderator_notes || [],
     stats: {
-      rating: 4.7,
-      users: 120,
-      successRate: 85,
-      saves: 45,
-      adoptionCount: 90,
-      likes: 78,
-      comments: 12
+      rating: metadata.rating || 0,
+      users: metadata.users || 0,
+      successRate: metadata.successRate || 0,
+      saves: metadata.saves || 0,
+      adoptionCount: metadata.adoptionCount || 0,
+      likes: post.likes || 0,
+      comments: post.comments_count || 0
     },
-    lastUpdatedLabel: 'Just now',
-    lastUpdatedTimestamp: Date.now()
-  },
-  {
-    id: '2',
-    title: 'Data Science Career Path',
-    summary: 'Comprehensive roadmap to becoming a data scientist',
-    story: 'From basics to advanced concepts',
-    category: 'Data Science',
-    duration: '6 months',
-    difficulty: 'Advanced',
-    price: 'Premium',
-    successRate: 90,
-    image: 'https://images.pexels.com/photos/3861958/pexels-photo-3861958.jpeg',
-    creator: {
-      name: 'John Doe',
-      title: 'Data Science Lead',
-      avatar: undefined,
-      email: undefined,
-      verified: true
-    },
-    tags: ['Python', 'Machine Learning', 'Statistics'],
-    outcomes: ['Build ML models', 'Deploy data products'],
-    resources: [],
-    roadmap: [],
-    status: 'approved',
-    type: 'roadmap',
-    featured: true,
-    featuredRank: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    approvedAt: new Date().toISOString(),
-    approvedBy: 'admin',
-    moderatorNotes: [],
-    stats: {
-      rating: 4.9,
-      users: 85,
-      successRate: 90,
-      saves: 32,
-      adoptionCount: 70,
-      likes: 65,
-      comments: 8
-    },
-    lastUpdatedLabel: 'Just now',
-    lastUpdatedTimestamp: Date.now()
-  }
-];
+    lastUpdatedLabel: 'Recently updated',
+    lastUpdatedTimestamp: new Date(post.updated_at).getTime()
+  };
+}
 
-// Mock implementation of all functions required by the Firebase service
+/**
+ * Mapping helper for marketplace listings
+ */
+function mapListingToStory(listing: any): CommunityStory {
+  const metadata = listing.metadata || {};
+  return {
+    id: listing.id,
+    title: listing.title,
+    summary: listing.description.substring(0, 150) + '...',
+    story: listing.description,
+    category: listing.category || 'Marketplace',
+    duration: listing.availability,
+    difficulty: 'Intermediate',
+    price: listing.price_range ? 'Premium' : 'Free',
+    successRate: metadata.successRate || 0,
+    image: metadata.image || '',
+    creator: {
+      name: metadata.creator_name || 'Service Provider',
+      title: metadata.creator_title || '',
+      avatar: metadata.creator_avatar || '',
+      email: metadata.creator_email || '',
+      verified: metadata.creator_verified || false
+    },
+    tags: listing.skills || [],
+    outcomes: metadata.outcomes || [],
+    resources: [],
+    roadmap: [],
+    status: (listing.status === 'active' ? 'approved' : 'pending') as CommunityStoryStatus,
+    type: 'marketplace',
+    featured: metadata.featured || false,
+    featuredRank: metadata.featuredRank || null,
+    createdAt: listing.created_at,
+    updatedAt: listing.updated_at,
+    stats: {
+      rating: metadata.rating || 0,
+      users: metadata.users || 0,
+      successRate: metadata.successRate || 0,
+      saves: metadata.saves || 0,
+      adoptionCount: metadata.adoptionCount || 0,
+      likes: metadata.likes || 0,
+      comments: metadata.comments || 0
+    },
+    lastUpdatedLabel: 'Recently active',
+    lastUpdatedTimestamp: new Date(listing.updated_at).getTime()
+  };
+}
+
 export function listenToCommunityStories(
   options: CommunityStoryQueryOptions,
   handlers: {
@@ -111,50 +117,244 @@ export function listenToCommunityStories(
     onError?: (error: Error) => void;
   }
 ) {
-  // Simulate real-time updates with mock data
-  setTimeout(() => {
-    handlers.onNext(mockStories.filter(story => {
-      if (options.status && story.status !== options.status) return false;
-      if (options.type && story.type !== options.type) return false;
-      if (options.category && story.category !== options.category) return false;
-      if (options.featuredOnly && !story.featured) return false;
-      return true;
-    }));
-  }, 0);
+  // Use a combination of individual fetches or simplified real-time depending on the type
+  const typeFilter = options.type || ['roadmap', 'marketplace'];
+  const types = Array.isArray(typeFilter) ? typeFilter : [typeFilter];
 
-  // Return a mock unsubscribe function
+  // For real-time, we'd ideally use supabase.channel().on('postgres_changes', ...).subscribe()
+  // For now, we'll perform an initial fetch and provide the handler
+  fetchCommunityStories(options)
+    .then(handlers.onNext)
+    .catch(handlers.onError);
+
+  // Return a mock unsubscribe for now, or implement real subscription if needed
   return {
-    unsubscribe: () => {}
+    unsubscribe: () => { }
   };
 }
 
 export async function fetchCommunityStories(
   options: CommunityStoryQueryOptions
 ): Promise<CommunityStory[]> {
-  // Filter mock stories based on options
-  return mockStories.filter(story => {
-    if (options.status && story.status !== options.status) return false;
-    if (options.type && story.type !== options.type) return false;
-    if (options.category && story.category !== options.category) return false;
-    if (options.featuredOnly && !story.featured) return false;
-    return true;
+  const stories: CommunityStory[] = [];
+  const typeFilter = options.type || ['roadmap', 'marketplace'];
+  const types = Array.isArray(typeFilter) ? typeFilter : [typeFilter];
+
+  // 1. Fetch from community_posts (Roadmaps)
+  if (types.includes('roadmap')) {
+    let query = supabase
+      .from('community_posts')
+      .select('*')
+      .eq('type', 'roadmap');
+
+    if (options.status) {
+      const visibility = options.status === 'approved' ? 'public' : options.status === 'pending' ? 'admins' : 'public';
+      query = query.eq('visibility', visibility);
+    } else {
+      query = query.eq('visibility', 'public');
+    }
+
+    if (options.category) {
+      // In community_posts, category is in metadata
+      query = query.contains('metadata', { category: options.category });
+    }
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching roadmaps:', error);
+    } else if (data) {
+      stories.push(...data.map(mapPostToStory));
+    }
+  }
+
+  // 2. Fetch from marketplace_listings
+  if (types.includes('marketplace')) {
+    let query = supabase
+      .from('marketplace_listings')
+      .select('*');
+
+    if (options.status) {
+      const statusValue = options.status === 'approved' ? 'active' : 'paused';
+      query = query.eq('status', statusValue);
+    } else {
+      query = query.eq('status', 'active');
+    }
+
+    if (options.category) {
+      query = query.eq('category', options.category);
+    }
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching marketplace listings:', error);
+    } else if (data) {
+      stories.push(...data.map(mapListingToStory));
+    }
+  }
+
+  // Sort combined results
+  if (options.orderBy === 'featuredRank') {
+    return stories.sort((a, b) => (a.featuredRank || 999) - (b.featuredRank || 999));
+  }
+
+  const sortDirection = options.descending === false ? 1 : -1;
+  return stories.sort((a, b) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    return (timeB - timeA) * sortDirection;
   });
 }
 
 export async function getCommunityStory(id: string): Promise<CommunityStory | null> {
-  return mockStories.find(story => story.id === id) || null;
+  // First try roadmaps
+  const { data: post, error: postError } = await supabase
+    .from('community_posts')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (post) return mapPostToStory(post);
+
+  // Then try marketplace
+  const { data: listing, error: listingError } = await supabase
+    .from('marketplace_listings')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (listing) return mapListingToStory(listing);
+
+  return null;
 }
 
 export async function submitCommunityStory(input: CommunityStorySubmissionInput) {
-  // TODO: Implement actual submission to Supabase when schema is ready
-  console.log('Submitting story:', input);
-  // For now, just return a mock ID
-  return { id: `mock-${Date.now()}` };
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) throw new Error('Not authenticated');
+
+  if (input.type === 'marketplace') {
+    const { data, error } = await supabase
+      .from('marketplace_listings')
+      .insert({
+        user_id: user.data.user.id,
+        title: input.title,
+        description: input.summary + (input.story ? '\n\n' + input.story : ''),
+        category: input.category,
+        skills: input.tags || [],
+        status: 'active',
+        metadata: {
+          creator_name: input.creator.name,
+          creator_title: input.creator.title,
+          creator_avatar: input.creator.avatar,
+          creator_email: input.creator.email,
+          image: input.coverImage,
+          successRate: input.successRate,
+          outcomes: input.outcomes
+        }
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { id: data.id };
+  } else {
+    // Default to roadmap/post
+    const { data, error } = await supabase
+      .from('community_posts')
+      .insert({
+        user_id: user.data.user.id,
+        type: 'roadmap',
+        title: input.title,
+        content: input.story || input.summary,
+        tags: input.tags || [],
+        visibility: 'admins', // New submissions are pending by default
+        metadata: {
+          summary: input.summary,
+          category: input.category,
+          duration: input.duration,
+          difficulty: input.difficulty,
+          price: input.price,
+          image: input.coverImage,
+          creator_name: input.creator.name,
+          creator_title: input.creator.title,
+          creator_avatar: input.creator.avatar,
+          creator_email: input.creator.email,
+          successRate: input.successRate,
+          outcomes: input.outcomes,
+          resources: input.resources,
+          roadmap: input.roadmap,
+          creator_notes: input.creatorNotes
+        }
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { id: data.id };
+  }
 }
 
 export async function updateCommunityStory(id: string, updates: CommunityStoryUpdateInput) {
-  // TODO: Implement actual update to Supabase when schema is ready
-  console.log('Updating story:', id, updates);
+  // Determine if it's a post or listing
+  const story = await getCommunityStory(id);
+  if (!story) throw new Error('Story not found');
+
+  if (story.type === 'marketplace') {
+    const { error } = await supabase
+      .from('marketplace_listings')
+      .update({
+        title: updates.title,
+        description: updates.summary || updates.story ? (updates.summary || '') + (updates.story ? '\n\n' + updates.story : '') : undefined,
+        category: updates.category,
+        status: updates.status === 'approved' ? 'active' : updates.status === 'hidden' ? 'closed' : undefined,
+        metadata: {
+          ...((await supabase.from('marketplace_listings').select('metadata').eq('id', id).single()).data?.metadata as object),
+          image: updates.image,
+          featured: updates.featured,
+          featuredRank: updates.featuredRank,
+          approved_at: updates.approvedAt,
+          approved_by: updates.approvedBy
+        }
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('community_posts')
+      .update({
+        title: updates.title,
+        content: updates.story,
+        tags: updates.tags,
+        visibility: updates.status === 'approved' ? 'public' : updates.status === 'hidden' ? 'admins' : undefined,
+        metadata: {
+          ...((await supabase.from('community_posts').select('metadata').eq('id', id).single()).data?.metadata as object),
+          summary: updates.summary,
+          category: updates.category,
+          duration: updates.duration,
+          difficulty: updates.difficulty,
+          price: updates.price,
+          image: updates.image,
+          featured: updates.featured,
+          featuredRank: updates.featuredRank,
+          approved_at: updates.approvedAt,
+          approved_by: updates.approvedBy,
+          roadmap: updates.roadmap,
+          resources: updates.resources
+        }
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+
   return { id };
 }
 
@@ -163,9 +363,11 @@ export async function setCommunityStoryStatus(
   status: CommunityStoryStatus,
   metadata?: { approvedBy?: string }
 ) {
-  // TODO: Implement actual status update to Supabase when schema is ready
-  console.log('Updating status:', id, status, metadata);
-  return { id };
+  return updateCommunityStory(id, {
+    status,
+    approvedBy: metadata?.approvedBy,
+    approvedAt: status === 'approved' ? new Date().toISOString() : undefined
+  });
 }
 
 export async function setCommunityStoryFeatured(
@@ -173,34 +375,58 @@ export async function setCommunityStoryFeatured(
   featured: boolean,
   featuredRank?: number | null
 ) {
-  // TODO: Implement actual featured update to Supabase when schema is ready
-  console.log('Setting featured:', id, featured, featuredRank);
-  return { id };
+  return updateCommunityStory(id, { featured, featuredRank });
 }
 
 export async function recordCommunityStoryAdoption(id: string) {
-  // TODO: Implement actual adoption recording to Supabase when schema is ready
-  console.log('Recording adoption for story:', id);
-  return { id };
+  // Implementation for incrementing adoptionCount in metadata
+  // This is complex with JSONB in Supabase without a RPC, so we'll do a read-modify-write for now
+  // In production, an Edge Function or RPC would be better
+  const story = await getCommunityStory(id);
+  if (!story) return;
+
+  const currentCount = story.stats.adoptionCount || 0;
+  return updateCommunityStory(id, {
+    stats: { ...story.stats, adoptionCount: currentCount + 1 }
+  });
 }
 
 export async function recordCommunityStoryLike(id: string) {
-  // TODO: Implement actual like recording to Supabase when schema is ready
-  console.log('Recording like for story:', id);
+  const { error } = await supabase.rpc('increment_post_likes', { post_id: id });
+  if (error) {
+    // Fallback if RPC doesn't exist
+    const { data: post } = await supabase.from('community_posts').select('likes').eq('id', id).single();
+    if (post) {
+      await supabase.from('community_posts').update({ likes: (post.likes || 0) + 1 }).eq('id', id);
+    }
+  }
   return { id };
 }
 
 export async function recordCommunityStorySave(id: string) {
-  // TODO: Implement actual save recording to Supabase when schema is ready
-  console.log('Recording save for story:', id);
-  return { id };
+  const story = await getCommunityStory(id);
+  if (!story) return;
+
+  const currentCount = story.stats.saves || 0;
+  return updateCommunityStory(id, {
+    stats: { ...story.stats, saves: currentCount + 1 }
+  });
 }
 
 export async function appendModeratorNote(
   id: string,
   entry: { note: string; author?: string }
 ) {
-  // TODO: Implement actual note appending to Supabase when schema is ready
-  console.log('Appending moderator note for story:', id, entry);
-  return { id };
+  const story = await getCommunityStory(id);
+  if (!story) return;
+
+  const notes = [...(story.moderatorNotes || [])];
+  notes.push({
+    id: `note-${Date.now()}`,
+    note: entry.note,
+    createdAt: new Date().toISOString(),
+    author: entry.author
+  });
+
+  return updateCommunityStory(id, { moderatorNotes: notes });
 }

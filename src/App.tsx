@@ -1,48 +1,148 @@
-import React, { useEffect, useState } from 'react';
-import LandingPage from './components/LandingPage';
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import AppLayout from './components/AppLayout';
+import { useSwipe } from './hooks/useSwipe';
+import LoadingFallback from './components/ui/LoadingFallback';
+import { PWAInstallBanner } from './hooks/usePWA';
+
+// Core components - loaded immediately
+import LandingPage from './components/LandingPageV3';
 import AuthScreen from './components/AuthScreen';
-import ChatInterface from './components/ChatInterface';
 import Dashboard from './components/Dashboard';
-import Profile from './components/Profile';
-import Navigation from './components/Navigation';
-import OpportunityDetail from './components/OpportunityDetail';
-import AllOpportunities from './components/AllOpportunities';
-import PersonalizedRoadmap from './components/PersonalizedRoadmap';
-import OpportunityRoadmap from './components/OpportunityRoadmap';
-import SettingsMenu from './components/SettingsMenu';
-import EditProfileScreen from './components/EditProfileScreen';
-import NotificationsScreen from './components/NotificationsScreen';
-import PrivacyScreen from './components/PrivacyScreen';
-import HelpScreen from './components/HelpScreen';
-import CVManagement from './components/CVManagement';
-import AddGoalScreen from './components/AddGoalScreen';
-import CommunityMarketplace from './components/CommunityMarketplace';
+import SplashScreen from './components/SplashScreen';
+import NotFoundPage from './components/NotFoundPage';
 import IntroductionPopup from './components/IntroductionPopup';
-import AllGoals from './components/AllGoals';
-import AchievementsScreen from './components/AchievementsScreen';
+
+// Lazy-loaded components - loaded on demand for better performance
+const ChatInterface = lazy(() => import('./components/ChatInterface'));
+const Profile = lazy(() => import('./components/Profile'));
+const OpportunityDetail = lazy(() => import('./components/OpportunityDetail'));
+const AllOpportunities = lazy(() => import('./components/AllOpportunities'));
+const PersonalizedRoadmap = lazy(() => import('./components/PersonalizedRoadmap'));
+const OpportunityRoadmap = lazy(() => import('./components/OpportunityRoadmap'));
+const SettingsMenu = lazy(() => import('./components/SettingsMenu'));
+const EditProfileScreen = lazy(() => import('./components/EditProfileScreen'));
+const NotificationsScreen = lazy(() => import('./components/NotificationsScreen'));
+const PrivacyScreen = lazy(() => import('./components/PrivacyScreen'));
+const HelpScreen = lazy(() => import('./components/HelpScreen'));
+const CVManagement = lazy(() => import('./components/CVManagement'));
+const AddGoalScreen = lazy(() => import('./components/AddGoalScreen'));
+const CommunityMarketplace = lazy(() => import('./components/CommunityMarketplace'));
+const PersonalizationProfileScreen = lazy(() => import('./components/PersonalizationProfileScreen'));
+const AllGoals = lazy(() => import('./components/AllGoals'));
+const AchievementsScreen = lazy(() => import('./components/AchievementsScreen'));
+const PackageDetail = lazy(() => import('./components/PackageDetail'));
+const AdminRoot = lazy(() => import('./admin/AdminRoot'));
 import { useDarkMode } from './hooks/useDarkMode';
 import { Goal, useGoals } from './hooks/useGoals';
 import { authService, getProfileFromUser, isNewUser } from './lib/auth';
 import { useAnalytics } from './hooks/useAnalytics';
+import { initializeCapacitor, configureStatusBar, isNativePlatform } from './lib/capacitor';
 import type { Opportunity } from './types/opportunity';
 import type { AppUser } from './types/user';
 import type { OnboardingProfileData, OnboardingState } from './types/onboarding';
-import { fetchUserProfile, hasCompletedOnboarding, saveOnboardingProfile, extractOnboardingState } from './services/profile';
+import type { CommunityStory } from './types/community';
+import { fetchUserProfile, saveOnboardingProfile, extractOnboardingState } from './services/profile';
 
-export type Screen = 'landing' | 'auth' | 'chat' | 'dashboard' | 'all-goals' | 'profile' | 'opportunity-detail' | 'all-opportunities' | 'roadmap' | 'opportunity-roadmap' | 'settings' | 'profile-edit' | 'notifications' | 'privacy' | 'help' | 'cv-management' | 'add-goal' | 'community-marketplace' | 'achievements';
+export type Screen = 'landing' | 'auth' | 'chat' | 'dashboard' | 'all-goals' | 'profile' | 'opportunity-detail' | 'all-opportunities' | 'roadmap' | 'opportunity-roadmap' | 'settings' | 'profile-edit' | 'notifications' | 'privacy' | 'help' | 'cv-management' | 'add-goal' | 'community-marketplace' | 'achievements' | 'package-detail' | 'personalization';
+
+import type { DashboardRef } from './components/Dashboard';
 
 export function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('landing');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<AppUser | null>(null);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [selectedCommunityStory, setSelectedCommunityStory] = useState<CommunityStory | null>(null);
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null); // Store selected package ID
   const [showIntroPopup, setShowIntroPopup] = useState(false);
+  const [showSplash, setShowSplash] = useState(false);
   const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
-  const [hasDismissedOnboarding, setHasDismissedOnboarding] = useState(false);
   const [manualOnboardingTrigger, setManualOnboardingTrigger] = useState(false);
+  const dashboardRef = useRef<DashboardRef>(null);
   const { goals, createGoal } = useGoals();
   const { isDarkMode } = useDarkMode();
   const { recordOpportunityExplored } = useAnalytics();
+
+  // Initialize Capacitor for Android/iOS
+  useEffect(() => {
+    const handleDeepLink = async (url: string) => {
+      console.log('Deep link received:', url);
+      // Handle OAuth callback
+      if (url.includes('auth') || url.includes('callback')) {
+        try {
+          const sessionData = await authService.handleOAuthCallback(url);
+          if (sessionData?.session?.user) {
+            const profile = getProfileFromUser(sessionData.session.user);
+            if (profile) {
+              setUser(profile);
+              setShowSplash(true);
+              navigate('/app/home');
+            }
+          }
+        } catch (error) {
+          console.error('OAuth callback error:', error);
+        }
+      }
+    };
+
+    const handleBackButton = (): boolean => {
+      // Return true if we handled the back action
+      if (showIntroPopup) {
+        setShowIntroPopup(false);
+        return true;
+      }
+      if (showSplash) {
+        setShowSplash(false);
+        return true;
+      }
+      return false;
+    };
+
+    initializeCapacitor({
+      onBackButton: handleBackButton,
+      onDeepLink: handleDeepLink,
+      isDarkMode
+    });
+  }, [navigate, showIntroPopup, showSplash, isDarkMode]);
+
+  // Update status bar when dark mode changes
+  useEffect(() => {
+    if (isNativePlatform) {
+      configureStatusBar(isDarkMode);
+    }
+  }, [isDarkMode]);
+
+  const handleLogout = async () => {
+    scrollToTop();
+    try {
+      await authService.signOut();
+    } catch (error) {
+      console.error('Failed to sign out from Supabase', error);
+    } finally {
+      setUser(null);
+      setSelectedGoalId(null);
+      setSelectedOpportunity(null);
+      setShowIntroPopup(false);
+      setShowSplash(false);
+      navigate('/');
+    }
+  };
+
+  const handleGetStarted = (userData?: any) => {
+    scrollToTop();
+    if (userData && typeof userData === 'object' && 'id' in userData) {
+      setUser(userData);
+      navigate('/app/home');
+    } else {
+      if (user) {
+        navigate('/app/home');
+      } else {
+        navigate('/auth');
+      }
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -57,7 +157,29 @@ export function App() {
         const profile = getProfileFromUser(session.user);
         if (profile) {
           setUser(profile);
-          setCurrentScreen((previous) => (previous === 'landing' ? 'dashboard' : previous));
+
+          // Check if this is a new signup by looking at URL parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          const isSignup = urlParams.get('signup') === 'true';
+
+          // If this is a new signup, we may want to trigger onboarding
+          if (isSignup) {
+            navigate('/app/home');
+            try {
+              const profileData = await fetchUserProfile(session.user.id);
+              const isActuallyNew = isNewUser(profileData, session.user ?? null);
+              if (isActuallyNew && (!profileData?.preferences?.onboarding?.completed)) {
+                setShowIntroPopup(true);
+              }
+            } catch (onboardingError) {
+              console.error('Error checking onboarding status', onboardingError);
+              setShowIntroPopup(true);
+            }
+          } else {
+            if (location.pathname === '/' || location.pathname === '/auth') {
+              navigate('/app/home');
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to restore Supabase session', error);
@@ -75,17 +197,38 @@ export function App() {
         const profile = getProfileFromUser(session.user);
         if (profile) {
           setUser(profile);
-        }
 
-        setCurrentScreen((previous) => (previous === 'auth' || previous === 'landing' ? 'dashboard' : previous));
+          // Check if this is a new signup by looking at URL parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          const isSignup = urlParams.get('signup') === 'true';
+
+          if (isSignup) {
+            navigate('/app/home');
+            setTimeout(async () => {
+              try {
+                const profileData = await fetchUserProfile(session.user.id);
+                const isActuallyNew = isNewUser(profileData, session.user ?? null);
+                if (isActuallyNew && (!profileData?.preferences?.onboarding?.completed)) {
+                  setShowIntroPopup(true);
+                }
+              } catch (onboardingError) {
+                console.error('Error checking onboarding status', onboardingError);
+                setShowIntroPopup(true);
+              }
+            }, 500);
+          } else {
+            if (location.pathname === '/' || location.pathname === '/auth') {
+              navigate('/app/home');
+            }
+          }
+        }
       } else {
         setUser(null);
         setSelectedGoalId(null);
         setOnboardingState(null);
         setManualOnboardingTrigger(false);
-        setHasDismissedOnboarding(false);
         setShowIntroPopup(false);
-        setCurrentScreen('landing');
+        navigate('/');
       }
     });
 
@@ -96,7 +239,6 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setHasDismissedOnboarding(false);
     setManualOnboardingTrigger(false);
     setOnboardingState(null);
   }, [user?.id]);
@@ -113,8 +255,6 @@ export function App() {
     const evaluateOnboarding = async () => {
       try {
         const profile = await fetchUserProfile(user.id);
-        const session = await authService.getSession();
-        const currentUser = session?.user || null;
 
         if (!isActive) {
           return;
@@ -136,25 +276,24 @@ export function App() {
           return onboarding ?? null;
         });
 
-        if (!manualOnboardingTrigger) {
-          // Show the intro popup only for:
-          // 1. New users who haven't completed onboarding yet, OR
-          // 2. Users who haven't completed onboarding and are coming back (with error fallback)
-          // Check if user is new using the helper function
-          const isActuallyNew = isNewUser(profile, currentUser);
-          const shouldAutoShow = (!onboarding?.completed && isActuallyNew) ||
-                                (!onboarding?.completed && !hasDismissedOnboarding && !profile);
-          setShowIntroPopup(shouldAutoShow);
+        // IMPORTANT: We DO NOT auto-show the popup here anymore.
+        // The popup is only shown when:
+        // 1. manualOnboardingTrigger is true (user clicked "Redo Onboarding" in settings)
+        // 2. A new signup was detected via URL parameter (handled in the auth state change effect)
+        // This prevents the popup from appearing on every page refresh.
+
+        if (manualOnboardingTrigger) {
+          // Only show if manually triggered
+          setShowIntroPopup(true);
         }
+        // For returning users, we respect their previous onboarding completion.
+        // If they dismissed or completed onboarding before, don't show it again automatically.
+
       } catch (error) {
         console.error('Failed to load onboarding status', error);
         if (isActive) {
           setOnboardingState(null);
-          if (!manualOnboardingTrigger) {
-            // If we can't determine onboarding status, we still want to prevent the popup
-            // from appearing on every login for existing users
-            setShowIntroPopup(false);
-          }
+          // Don't auto-show popup on error - user can manually trigger from settings
         }
       }
     };
@@ -164,37 +303,45 @@ export function App() {
     return () => {
       isActive = false;
     };
-  }, [user?.id, hasDismissedOnboarding, manualOnboardingTrigger]);
+  }, [user?.id, manualOnboardingTrigger]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleGetStarted = (userData?: AppUser) => {
-    scrollToTop();
-    if (userData) {
-      setUser(userData);
-    } else {
-      setCurrentScreen('auth');
+  const handleAuthSuccess = useCallback((userData: AppUser) => {
+    // Prevent multiple calls
+    if (user?.id === userData.id) {
+      return;
     }
-  };
 
-  const handleAuthSuccess = (userData: AppUser) => {
     scrollToTop();
     setUser(userData);
-  };
+
+    // Clean up signup parameter from URL if present
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('signup') === 'true') {
+      const newUrl = window.location.pathname + window.location.search.replace(/[?&]signup=true/, '');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+
+    // Reset onboarding flags
+    setManualOnboardingTrigger(false);
+
+    // Show splash screen and navigate to home
+    setShowSplash(true);
+    navigate('/app/home');
+  }, [user?.id, navigate]);
 
   const handleRedoOnboarding = () => {
     if (!user) {
       return;
     }
-    setHasDismissedOnboarding(false);
-    setManualOnboardingTrigger(true);
-    setShowIntroPopup(true);
+    // Navigate to the personalization profile page instead of showing popup
+    navigate('/app/personalization');
   };
 
   const handleIntroComplete = async (profileData: OnboardingProfileData | null) => {
-    setHasDismissedOnboarding(true);
     setManualOnboardingTrigger(false);
 
     if (user?.id && profileData) {
@@ -230,7 +377,7 @@ export function App() {
     }
 
     setShowIntroPopup(false);
-    setCurrentScreen('dashboard');
+    navigate('/app/home');
   };
 
   const handleOpportunitySelect = (opportunity: Opportunity) => {
@@ -241,255 +388,257 @@ export function App() {
       category: opportunity.category
     });
     setSelectedOpportunity(opportunity);
-    setCurrentScreen('opportunity-detail');
+    navigate(`/app/opportunity/${opportunity.id}`);
   };
 
   const handleAddToGoals = (opportunity: Opportunity) => {
     scrollToTop();
     setSelectedOpportunity(opportunity);
-    setCurrentScreen('opportunity-roadmap');
+    navigate(`/app/opportunity/${opportunity.id}/roadmap`);
   };
 
   const handleGoalClick = (goalId: string) => {
     scrollToTop();
     setSelectedGoalId(goalId);
-    setCurrentScreen('roadmap');
+    navigate(`/app/goal/${goalId}/roadmap`);
   };
 
-  const handleLogout = async () => {
+  const handleNavigate = (screen: string) => {
     scrollToTop();
-    try {
-      await authService.signOut();
-    } catch (error) {
-      console.error('Failed to sign out from Supabase', error);
-      } finally {
-        setUser(null);
-        setSelectedGoalId(null);
-        setSelectedOpportunity(null);
-        setShowIntroPopup(false);
-        setHasDismissedOnboarding(false);
-        setCurrentScreen('landing');
+    if (screen === 'logout') {
+      handleLogout();
+    } else {
+      const pathMap: Record<string, string> = {
+        'landing': '/',
+        'auth': '/auth',
+        'dashboard': '/app/home',
+        'all-opportunities': '/app/opportunities',
+        'chat': '/app/chat',
+        'profile': '/app/profile',
+        'all-goals': '/app/goals',
+        'community-marketplace': '/app/community',
+        'achievements': '/app/achievements',
+        'settings': '/app/settings',
+        'cv-management': '/app/cv',
+        'add-goal': '/app/add-goal'
+      };
+      navigate(pathMap[screen] || `/app/${screen}`);
+    }
+  };
+
+  const handleBack = (fallback: string = 'dashboard') => {
+    scrollToTop();
+    // Special logic for refreshing dashboard if coming back from opportunities
+    if (location.pathname.includes('/opportunities') || location.pathname.includes('/opportunity')) {
+      if (dashboardRef.current) {
+        dashboardRef.current.refreshOpportunities();
       }
-    };
+    }
 
-  const handleNavigate = (screen: Screen | string) => {
-    scrollToTop();
-    setCurrentScreen(screen as Screen);
+    // Default back behavior
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      handleNavigate(fallback);
+    }
   };
 
-  const handleBack = (targetScreen: Screen) => {
-    scrollToTop();
-    setCurrentScreen(targetScreen);
+  const handleSwipeLeft = () => {
+    const mainTabs = ['/app/home', '/app/opportunities', '/app/chat', '/app/community'];
+    const currentIndex = mainTabs.indexOf(location.pathname);
+    if (currentIndex >= 0 && currentIndex < mainTabs.length - 1) {
+      navigate(mainTabs[currentIndex + 1]);
+      scrollToTop();
+    }
   };
 
-  const handleAddGoal = () => {
-    scrollToTop();
-    setCurrentScreen('add-goal');
+  const handleSwipeRight = () => {
+    const mainTabs = ['/app/home', '/app/opportunities', '/app/chat', '/app/community'];
+    const currentIndex = mainTabs.indexOf(location.pathname);
+    if (currentIndex > 0) {
+      navigate(mainTabs[currentIndex - 1]);
+      scrollToTop();
+    }
   };
 
-  const handleViewAllGoals = () => {
-    scrollToTop();
-    setCurrentScreen('all-goals');
-  };
+  useSwipe({
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
+    threshold: 50
+  });
 
   const handleGoalCreated = (goal: Goal) => {
     scrollToTop();
     setSelectedGoalId(goal.id);
     if (goal.source === 'template') {
-      setCurrentScreen('roadmap');
-      return;
+      navigate(`/app/goal/${goal.id}/roadmap`);
+    } else {
+      navigate('/app/home');
     }
-    setCurrentScreen('dashboard');
   };
 
-  const handleCommunityRoadmapSelect = (roadmap: any) => {
+  const handleCommunityRoadmapSelect = async (roadmap: any) => {
     scrollToTop();
-    const existingGoal = goals.find((goal) => goal.templateId === roadmap.id);
-    const goal =
-      existingGoal ||
-      createGoal({
-        title: roadmap.title,
-        description: roadmap.description,
-        category: roadmap.category,
-        source: 'template',
-        templateId: roadmap.id,
-        progress: 0
-      });
-    setSelectedGoalId(goal.id);
-    setCurrentScreen('roadmap');
-  };
-
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'landing':
-        return <LandingPage onGetStarted={() => handleGetStarted()} />;
-      case 'auth':
-        return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
-      case 'chat':
-        return <ChatInterface user={user} />;
-      case 'dashboard':
-        return (
-          <Dashboard 
-            user={user} 
-            onOpportunityClick={handleOpportunitySelect}
-            onViewAllOpportunities={() => handleNavigate('all-opportunities')}
-            onGoalClick={handleGoalClick}
-            onNavigate={handleNavigate}
-            onAddGoal={handleAddGoal}
-            onViewAllGoals={handleViewAllGoals}
-            onboardingProfile={onboardingState?.data ?? null}
-            onRedoOnboarding={handleRedoOnboarding}
-          />
-        );
-      case 'profile':
-        return (
-          <Profile 
-            user={user} 
-            setUser={setUser}
-            onNavigate={handleNavigate}
-            onLogout={handleLogout}
-          />
-        );
-      case 'opportunity-detail':
-        if (!selectedOpportunity) {
-          return (
-            <AllOpportunities
-              onBack={() => handleBack('dashboard')}
-              onSelectOpportunity={handleOpportunitySelect}
-            />
-          );
-        }
-        return (
-          <OpportunityDetail
-            opportunity={selectedOpportunity}
-            onBack={() => handleBack('dashboard')}
-            onAddToGoals={handleAddToGoals}
-          />
-        );
-      case 'all-goals':
-        return (
-          <AllGoals
-            onBack={() => handleBack('dashboard')}
-            onSelectGoal={handleGoalClick}
-            onAddGoal={handleAddGoal}
-          />
-        );
-      case 'all-opportunities':
-        return (
-          <AllOpportunities
-            onBack={() => handleBack('dashboard')}
-            onSelectOpportunity={handleOpportunitySelect}
-          />
-        );
-      case 'roadmap':
-        return (
-          <PersonalizedRoadmap 
-            onBack={() => handleBack('dashboard')}
-            goalId={selectedGoalId ?? undefined}
-            onboardingProfile={onboardingState?.data ?? null}
-            onRedoOnboarding={handleRedoOnboarding}
-          />
-        );
-      case 'opportunity-roadmap':
-        if (!selectedOpportunity) {
-          return (
-            <AllOpportunities
-              onBack={() => handleBack('dashboard')}
-              onSelectOpportunity={handleOpportunitySelect}
-            />
-          );
-        }
-        return (
-          <OpportunityRoadmap
-            onBack={() => handleBack('dashboard')}
-            opportunity={selectedOpportunity}
-          />
-        );
-      case 'settings':
-        return (
-          <SettingsMenu
-            onBack={() => handleBack('profile')}
-            onNavigate={handleNavigate}
-            onLogout={handleLogout}
-            onRedoOnboarding={handleRedoOnboarding}
-            onboardingProfile={onboardingState?.data ?? null}
-          />
-        );
-      case 'profile-edit':
-        return (
-          <EditProfileScreen
-            user={user}
-            setUser={setUser}
-            onBack={() => handleBack('settings')}
-          />
-        );
-      case 'notifications':
-        return (
-          <NotificationsScreen
-            onBack={() => handleBack('settings')}
-          />
-        );
-      case 'privacy':
-        return (
-          <PrivacyScreen
-            onBack={() => handleBack('settings')}
-          />
-        );
-      case 'help':
-        return (
-          <HelpScreen
-            onBack={() => handleBack('settings')}
-            user={user}
-          />
-        );
-      case 'cv-management':
-        return (
-          <CVManagement
-            onBack={() => handleBack('profile')}
-          />
-        );
-      case 'add-goal':
-        return (
-          <AddGoalScreen
-            onBack={() => handleBack('dashboard')}
-            onGoalCreated={handleGoalCreated}
-            onNavigate={handleNavigate}
-            user={user}
-          />
-        );
-      case 'community-marketplace':
-        return (
-          <CommunityMarketplace
-            onBack={() => handleBack('dashboard')}
-            onRoadmapSelect={handleCommunityRoadmapSelect}
-            user={user}
-          />
-        );
-      case 'achievements':
-        return (
-          <AchievementsScreen
-            onBack={() => handleBack('dashboard')}
-          />
-        );
-      default:
-        return <LandingPage onGetStarted={() => handleGetStarted()} />;
+    if (roadmap.id === 'mc-001' || roadmap.type === 'package') {
+      setSelectedPackageId(roadmap.id);
+      navigate(`/app/package/${roadmap.id}`);
+    } else {
+      const existingGoal = goals.find((g) => g.template_id === roadmap.id);
+      let goalId = existingGoal?.id;
+      if (!existingGoal) {
+        const newGoal = await createGoal({
+          title: roadmap.title,
+          description: roadmap.description,
+          category: roadmap.category,
+          source: 'template',
+          templateId: roadmap.id,
+          progress: 0
+        });
+        goalId = newGoal.id;
+      }
+      setSelectedGoalId(goalId!);
+      setSelectedCommunityStory(roadmap);
+      navigate(`/app/goal/${goalId}/roadmap`);
     }
   };
-
-  const showNavigation = currentScreen !== 'landing' && 
-                        currentScreen !== 'auth' && 
-                        !['opportunity-detail', 'roadmap', 'opportunity-roadmap', 'settings', 'profile-edit', 'notifications', 'privacy', 'help', 'cv-management', 'add-goal', 'community-marketplace'].includes(currentScreen);
 
   return (
     <div className={`min-h-screen bg-surface-body text-strong transition-theme ${isDarkMode ? 'dark' : ''}`}>
-      {showNavigation && (
-        <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />
+      {/* Splash Screen */}
+      {showSplash && (
+        <SplashScreen
+          onComplete={() => setShowSplash(false)}
+          userName={user?.name}
+        />
       )}
-      <main className={`${showNavigation ? 'pb-20 lg:pb-24' : ''} transition-theme`}>
-        {renderScreen()}
-      </main>
-      
-      {/* Introduction Popup */}
+
+      <Suspense fallback={<LoadingFallback message="Loading..." />}>
+        <Routes>
+          <Route path="/" element={<LandingPage onGetStarted={() => handleGetStarted()} />} />
+          <Route path="/auth" element={<AuthScreen onAuthSuccess={handleAuthSuccess} />} />
+          <Route path="/admin/*" element={<AdminRoot />} />
+
+          <Route path="/app" element={<AppLayout />}>
+            <Route index element={<Navigate to="/app/home" replace />} />
+            <Route path="home" element={
+              <Dashboard
+                ref={dashboardRef}
+                user={user}
+                onOpportunityClick={handleOpportunitySelect}
+                onViewAllOpportunities={() => navigate('/app/opportunities')}
+                onGoalClick={handleGoalClick}
+                onNavigate={handleNavigate}
+                onAddGoal={() => navigate('/app/add-goal')}
+                onViewAllGoals={() => navigate('/app/goals')}
+                onboardingProfile={onboardingState?.data ?? null}
+                onRedoOnboarding={handleRedoOnboarding}
+              />
+            } />
+            <Route path="opportunities" element={
+              <AllOpportunities
+                onBack={() => handleBack()}
+                onSelectOpportunity={handleOpportunitySelect}
+              />
+            } />
+            <Route path="chat" element={<ChatInterface user={user} onBack={() => handleBack()} />} />
+            <Route path="profile" element={
+              <Profile
+                user={user}
+                setUser={setUser}
+                onNavigate={handleNavigate}
+                onLogout={handleLogout}
+              />
+            } />
+            <Route path="goals" element={
+              <AllGoals
+                onBack={() => handleBack()}
+                onSelectGoal={handleGoalClick}
+                onAddGoal={() => navigate('/app/add-goal')}
+              />
+            } />
+            <Route path="community" element={
+              <CommunityMarketplace
+                onBack={() => handleBack()}
+                onRoadmapSelect={handleCommunityRoadmapSelect}
+                user={user}
+              />
+            } />
+            <Route path="achievements" element={<AchievementsScreen onBack={() => handleBack()} />} />
+            <Route path="add-goal" element={
+              <AddGoalScreen
+                onBack={() => handleBack()}
+                onGoalCreated={handleGoalCreated}
+                onNavigate={handleNavigate}
+                user={user}
+              />
+            } />
+            <Route path="opportunity/:id" element={
+              selectedOpportunity ? (
+                <OpportunityDetail
+                  opportunity={selectedOpportunity}
+                  onBack={() => handleBack()}
+                  onAddToGoals={handleAddToGoals}
+                />
+              ) : <Navigate to="/app/opportunities" replace />
+            } />
+            <Route path="opportunity/:id/roadmap" element={
+              selectedOpportunity ? (
+                <OpportunityRoadmap
+                  onBack={() => handleBack()}
+                  opportunity={selectedOpportunity}
+                />
+              ) : <Navigate to="/app/opportunities" replace />
+            } />
+            <Route path="goal/:id/roadmap" element={
+              <PersonalizedRoadmap
+                onBack={() => handleBack()}
+                goalId={selectedGoalId ?? undefined}
+                communityStory={selectedCommunityStory ?? undefined}
+              />
+            } />
+            <Route path="package/:id" element={
+              selectedPackageId ? (
+                <PackageDetail
+                  packageId={selectedPackageId}
+                  onBack={() => handleBack('/app/community')}
+                />
+              ) : <Navigate to="/app/community" replace />
+            } />
+            <Route path="settings" element={
+              <SettingsMenu
+                onBack={() => handleBack('profile')}
+                onNavigate={handleNavigate}
+                onLogout={handleLogout}
+                onRedoOnboarding={handleRedoOnboarding}
+                onboardingProfile={onboardingState?.data ?? null}
+              />
+            } />
+            <Route path="profile-edit" element={
+              <EditProfileScreen
+                user={user}
+                setUser={setUser}
+                onBack={() => handleBack('settings')}
+              />
+            } />
+            <Route path="notifications" element={<NotificationsScreen onBack={() => handleBack('settings')} />} />
+            <Route path="privacy" element={<PrivacyScreen onBack={() => handleBack('settings')} />} />
+            <Route path="help" element={<HelpScreen onBack={() => handleBack('settings')} user={user} />} />
+            <Route path="cv" element={<CVManagement onBack={() => handleBack('profile')} />} />
+            <Route path="personalization" element={
+              <PersonalizationProfileScreen
+                user={user}
+                onBack={() => handleBack('settings')}
+                onSave={(data) => {
+                  setOnboardingState({ completed: true, data, completedAt: new Date().toISOString() });
+                }}
+              />
+            } />
+          </Route>
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+
       {showIntroPopup && user && (
         <IntroductionPopup
           isOpen={showIntroPopup}
@@ -498,6 +647,9 @@ export function App() {
           initialData={onboardingState?.data ?? null}
         />
       )}
+
+      {/* PWA Install Banner */}
+      <PWAInstallBanner />
     </div>
   );
 }

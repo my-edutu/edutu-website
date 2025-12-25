@@ -9,12 +9,10 @@ import {
   CheckCircle,
   Trash2,
   MailSearch as MarkEmailRead,
-  Filter,
   AlertTriangle,
   Zap
 } from 'lucide-react';
 import Button from './ui/Button';
-import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useNotifications } from '../hooks/useNotifications';
 import type { AppNotification } from '../types/notification';
@@ -86,166 +84,155 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({ isOpen, onClose }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end">
-      <div className="absolute inset-0 bg-black/20 dark:bg-black/40" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-start justify-end p-4 md:p-6 pointer-events-none">
+      <div className="absolute inset-0 bg-gray-950/20 dark:bg-black/60 backdrop-blur-[2px] pointer-events-auto" onClick={onClose} />
 
-      <div className={`relative mt-16 mr-4 w-full max-w-md rounded-3xl border shadow-xl ${isDarkMode ? 'border-gray-700 bg-gray-900 text-gray-100' : 'border-gray-200 bg-white text-gray-900'}`}>
-        <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Notifications</h2>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Stay on top of opportunities, goal progress, and community updates.
-              </p>
+      <div className={`relative w-full max-w-md h-[80vh] flex flex-col rounded-[2.5rem] border shadow-2xl transition-all duration-500 transform pointer-events-auto animate-slide-in-right ${isDarkMode ? 'border-white/10 bg-gray-900/90' : 'border-slate-200/50 bg-white/90'
+        } backdrop-blur-2xl`}>
+
+        {/* Header */}
+        <div className={`p-6 border-b ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                <Bell size={22} className="animate-bounce-subtle" />
+              </div>
+              <div>
+                <h2 className={`text-xl font-display font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Notifications</h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <p className={`text-xs font-medium uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {unreadCount} Unread Message{unreadCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className={`rounded-full p-2 transition hover:opacity-80 ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}
-              aria-label="Close notifications"
+              className={`rounded-xl p-2 transition-all hover:scale-110 ${isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        <Card className="m-4 rounded-2xl border border-dashed border-subtle bg-transparent">
-          <div className={`flex items-center justify-between gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            <div className="flex items-center gap-2">
-              <Filter size={16} />
-              <span className="text-sm font-medium">Filter</span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                  filter === 'all'
-                    ? 'bg-primary text-white'
-                    : `${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
+        {/* Filters */}
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div className="flex p-1 rounded-xl bg-slate-100 dark:bg-white/5">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'all'
+                ? 'bg-white dark:bg-gray-800 text-brand-500 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                 }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilter('unread')}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                  filter === 'unread'
-                    ? 'bg-primary text-white'
-                    : `${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilter('unread')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'unread'
+                ? 'bg-white dark:bg-gray-800 text-brand-500 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                 }`}
-              >
-                Unread {unreadCount > 0 && `(${unreadCount})`}
-              </button>
-            </div>
+            >
+              Unread
+            </button>
           </div>
-          <div className="mt-3 flex items-center justify-between">
-            <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {loading ? 'Syncing...' : unreadCount === 0 ? 'All caught up' : `${unreadCount} unread`}
-            </div>
-            {unreadCount > 0 && (
-              <Button
-                variant="secondary"
-                onClick={() => void markAllAsRead()}
-                className="text-sm px-3 py-1"
-              >
-                <MarkEmailRead size={14} className="mr-1" />
-                Mark all as read
-              </Button>
-            )}
-          </div>
-        </Card>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => void markAllAsRead()}
+              className="text-[10px] font-bold text-brand-500 hover:text-brand-600 uppercase tracking-widest px-2 py-1"
+            >
+              Mark all as read
+            </button>
+          )}
+        </div>
 
-        <div className="flex-1 overflow-y-auto">
+        {/* Notifications List */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-3 custom-scrollbar">
           {loading ? (
-            <div className="space-y-3 p-4">
+            <div className="space-y-4 py-2">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={`notification-skeleton-${index}`}
-                  className={`animate-pulse rounded-2xl border p-4 ${isDarkMode ? 'border-gray-700 bg-gray-800/60' : 'border-gray-200 bg-gray-50'}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`h-10 w-10 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                    <div className="flex-1 space-y-2">
-                      <div className={`h-4 w-2/3 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                      <div className={`h-3 w-full rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                    </div>
-                  </div>
-                </div>
+                  className={`animate-pulse rounded-2xl p-4 border aspect-[4/1] ${isDarkMode ? 'border-white/5 bg-white/5' : 'border-slate-100 bg-slate-50/50'}`}
+                />
               ))}
             </div>
           ) : filteredNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center p-6">
-              <Bell size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
-              <h3 className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'} mb-2`}>
-                {filter === 'unread' ? 'No unread notifications' : 'No notifications'}
+            <div className="flex flex-col items-center justify-center py-20 text-center opacity-40 grayscale">
+              <div className="h-16 w-16 rounded-3xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mb-4">
+                <MarkEmailRead size={32} />
+              </div>
+              <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                No New Notifications
               </h3>
-              <p className="text-gray-500 dark:text-gray-400">
-                {filter === 'unread'
-                  ? 'You’re all caught up!'
-                  : 'We’ll notify you when something important happens.'}
+              <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-tighter">
+                You are all caught up for now
               </p>
             </div>
           ) : (
-            <div className="p-4 space-y-3">
+            <div className="space-y-3 py-2">
               {filteredNotifications.map((notification, index) => (
                 <div
                   key={notification.id}
-                  className={`group cursor-pointer rounded-2xl border p-4 transition-all hover:shadow-md ${
-                    notification.readAt
-                      ? `${isDarkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-gray-50'}`
-                      : `${isDarkMode ? 'border-blue-800 bg-blue-900/20' : 'border-blue-200 bg-blue-50'}`
-                  }`}
+                  className={`group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 transform active:scale-[0.98] cursor-pointer ${notification.readAt
+                    ? `${isDarkMode ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`
+                    : `${isDarkMode ? 'bg-brand-500/10 border border-brand-500/20' : 'bg-brand-50 border border-brand-500/10'}`
+                    } hover:shadow-xl hover:shadow-brand-500/5`}
                   style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => void markAsRead(notification.id)}
                 >
-                  <div className="flex items-start gap-3">
+                  {/* Read Indicator Line */}
+                  {!notification.readAt && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-500" />
+                  )}
+
+                  <div className="flex items-start gap-4">
                     <div
-                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
-                        isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
-                      }`}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-110 ${isDarkMode ? 'bg-white/5' : 'bg-white shadow-sm'
+                        }`}
                     >
                       {iconForNotification(notification.kind, notification.severity)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3">
-                        <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'} line-clamp-1`}>
+                        <h4 className={`text-sm font-bold truncate ${!notification.readAt && (isDarkMode ? 'text-white' : 'text-slate-900')}`}>
                           {notification.title}
                         </h4>
-                        {!notification.readAt && <span className="h-2 w-2 rounded-full bg-primary" />}
-                      </div>
-                      <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} line-clamp-2`}>
-                        {notification.body}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter shrink-0 pt-0.5">
                           {formatTimestamp(notification.createdAt)}
                         </span>
-                        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                          {!notification.readAt && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void markAsRead(notification.id);
-                              }}
-                              className="rounded-full p-1 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
-                              title="Mark as read"
-                            >
-                              <CheckCircle size={14} className="text-green-600" />
-                            </button>
-                          )}
+                      </div>
+                      <p className={`mt-1 text-xs leading-relaxed line-clamp-2 ${!notification.readAt && (isDarkMode ? 'text-slate-300' : 'text-slate-600')}`}>
+                        {notification.body}
+                      </p>
+
+                      {/* Action Hooks */}
+                      <div className="mt-3 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
+                        {!notification.readAt && (
                           <button
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              void deleteNotification(notification.id);
+                              void markAsRead(notification.id);
                             }}
-                            className="rounded-full p-1 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
-                            title="Delete notification"
+                            className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
                           >
-                            <Trash2 size={14} className="text-red-600" />
+                            <CheckCircle size={14} />
                           </button>
-                        </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void deleteNotification(notification.id);
+                          }}
+                          className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -256,24 +243,25 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({ isOpen, onClose }
         </div>
 
         {error && (
-          <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
-            {error}
+          <div className="mx-6 mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[10px] font-bold text-rose-500 uppercase tracking-widest text-center">
+            Error: {error}
           </div>
         )}
 
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-center">
+        {/* Footer */}
+        <div className={`p-6 border-t ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
           {hasMore ? (
             <Button
               variant="secondary"
               onClick={() => void fetchMore()}
-              className="w-full"
+              className="w-full rounded-2xl font-bold text-xs py-3 h-auto"
             >
-              Load older notifications
+              Older Notifications
             </Button>
           ) : (
-            <div className={`flex items-center justify-center gap-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              <CheckCircle size={14} className="text-primary/70" />
-              Synced to latest
+            <div className={`flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-late-500' : 'text-slate-400'}`}>
+              <Zap size={10} className="text-amber-500" />
+              Fully Synced
             </div>
           )}
         </div>

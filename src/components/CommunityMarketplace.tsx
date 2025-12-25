@@ -1,44 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeft,
-  Bookmark,
-  Calendar,
-  CheckCircle,
-  ExternalLink,
-  Filter,
-  Globe,
-  Heart,
-  Link2,
   Plus,
   Search,
   Sparkles,
   Star,
-  Tag,
-  Users
+  Users,
+  Filter,
+  BookOpen,
+  ExternalLink,
+  RefreshCw,
+  Info,
+  Clock,
+  BarChart
 } from 'lucide-react';
 import Button from './ui/Button';
-import Card from './ui/Card';
 import Input from './ui/Input';
 import Textarea from './ui/Textarea';
 import Select from './ui/Select';
+import PageHeader from './PageHeader';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle
 } from './ui/Dialog';
 import { useToast } from './ui/ToastProvider';
 import { useDarkMode } from '../hooks/useDarkMode';
 import type { AppUser } from '../types/user';
-import type { CommunityResource, CommunityRoadmapStage, CommunityStoryStats } from '../types/community';
 import {
-  recordCommunityStoryAdoption,
-  recordCommunityStoryLike,
-  recordCommunityStorySave,
+  CommunityResource,
+  CommunityRoadmapStage,
+  CommunityStoryPrice,
+  CommunityStoryStats
+} from '../types/community';
+import {
   fetchCommunityStories,
-  listenToCommunityStories
+  submitCommunityStory
 } from '../services/communityMarketplaceSupabase';
 
 interface CommunityRoadmap {
@@ -75,9 +71,9 @@ interface CommunityRoadmap {
 }
 
 interface CommunityMarketplaceProps {
-  onBack: () => void;
   onRoadmapSelect: (roadmap: CommunityRoadmap) => void;
   user: AppUser | null;
+  onBack: () => void;
 }
 
 interface CreateRoadmapForm {
@@ -109,87 +105,87 @@ const FALLBACK_ROADMAPS: CommunityRoadmap[] = [
     description:
       'How Amara layered leadership, GMAT prep, and scholarship outreach to secure a fully funded Oxford MBA seat.',
     creator: { name: 'Amara Bello', avatar: 'MBA', title: 'Oxford Said MBA Scholar', verified: true },
-  creatorEmail: 'amara@edutu.ai',
-  category: 'Education',
-  duration: '18 months',
-  difficulty: 'Advanced',
-  rating: 4.9,
-  users: 912,
-  successRate: 62,
-  tags: ['MBA', 'Scholarships', 'Leadership'],
-  achievements: ['Oxford Said offer', 'Clarendon Scholarship', 'GMAT 740'],
-  price: 'Premium',
-  image: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg',
-  featured: true,
-  status: 'approved',
-  type: 'roadmap',
-  lastUpdatedLabel: '3 days ago',
-  lastUpdatedTimestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
-  story:
-    'Follow the exact playbook Amara used to balance leadership impact, GMAT excellence, and scholarship outreach to secure a fully funded Oxford MBA. Each milestone includes templates, outreach scripts, and scorecards.',
-  resources: [
-    {
-      id: 'ox-res-1',
-      title: 'Leadership Impact Tracker Template',
-      description: 'Spreadsheet template to quantify community and professional impact.',
-      url: 'https://example.com/resources/leadership-tracker',
-      type: 'tool',
-      cost: 'free'
-    },
-    {
-      id: 'ox-res-2',
-      title: 'GMAT 740 Study Schedule',
-      url: 'https://example.com/resources/gmat-740-plan',
-      type: 'article',
-      cost: 'free'
-    },
-    {
-      id: 'ox-res-3',
-      title: 'Clarendon Scholarship Outreach Email Pack',
-      url: 'https://example.com/resources/clarendon-outreach',
-      type: 'other',
-      cost: 'paid',
-      notes: 'Included in premium bundle'
-    }
-  ],
-  roadmap: [
-    {
-      id: 'ox-stage-1',
-      title: 'Months 1-3: Clarify your MBA narrative',
-      description: 'Audit achievements, map leadership themes, and shortlist programs.',
-      duration: '12 weeks',
-      tasks: []
-    },
-    {
-      id: 'ox-stage-2',
-      title: 'Months 4-6: GMAT excellence sprint',
-      description: 'Target a 720+ GMAT using Amara’s split-day approach.',
-      duration: '12 weeks',
-      tasks: []
-    },
-    {
-      id: 'ox-stage-3',
-      title: 'Months 7-12: Scholarship outreach & essays',
-      description: 'Run scholarship outreach cadences and polish your essays.',
-      duration: '24 weeks',
-      tasks: []
-    }
-  ],
-  stats: {
+    creatorEmail: 'amara@edutu.ai',
+    category: 'Education',
+    duration: '18 months',
+    difficulty: 'Advanced',
     rating: 4.9,
     users: 912,
     successRate: 62,
-    saves: 420,
-    adoptionCount: 318,
-    likes: 198,
-    comments: 64
+    tags: ['MBA', 'Scholarships', 'Leadership'],
+    achievements: ['Oxford Said offer', 'Clarendon Scholarship', 'GMAT 740'],
+    price: 'Premium',
+    image: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg',
+    featured: true,
+    status: 'approved',
+    type: 'roadmap',
+    lastUpdatedLabel: '3 days ago',
+    lastUpdatedTimestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
+    story:
+      'Follow the exact playbook Amara used to balance leadership impact, GMAT excellence, and scholarship outreach to secure a fully funded Oxford MBA. Each milestone includes templates, outreach scripts, and scorecards.',
+    resources: [
+      {
+        id: 'ox-res-1',
+        title: 'Leadership Impact Tracker Template',
+        description: 'Spreadsheet template to quantify community and professional impact.',
+        url: 'https://example.com/resources/leadership-tracker',
+        type: 'tool',
+        cost: 'free'
+      },
+      {
+        id: 'ox-res-2',
+        title: 'GMAT 740 Study Schedule',
+        url: 'https://example.com/resources/gmat-740-plan',
+        type: 'article',
+        cost: 'free'
+      },
+      {
+        id: 'ox-res-3',
+        title: 'Clarendon Scholarship Outreach Email Pack',
+        url: 'https://example.com/resources/clarendon-outreach',
+        type: 'other',
+        cost: 'paid',
+        notes: 'Included in premium bundle'
+      }
+    ],
+    roadmap: [
+      {
+        id: 'ox-stage-1',
+        title: 'Months 1-3: Clarify your MBA narrative',
+        description: 'Audit achievements, map leadership themes, and shortlist programs.',
+        duration: '12 weeks',
+        tasks: []
+      },
+      {
+        id: 'ox-stage-2',
+        title: 'Months 4-6: GMAT excellence sprint',
+        description: 'Target a 720+ GMAT using Amara’s split-day approach.',
+        duration: '12 weeks',
+        tasks: []
+      },
+      {
+        id: 'ox-stage-3',
+        title: 'Months 7-12: Scholarship outreach & essays',
+        description: 'Run scholarship outreach cadences and polish your essays.',
+        duration: '24 weeks',
+        tasks: []
+      }
+    ],
+    stats: {
+      rating: 4.9,
+      users: 912,
+      successRate: 62,
+      saves: 420,
+      adoptionCount: 318,
+      likes: 198,
+      comments: 64
+    },
+    paymentLink: 'https://market.edutu.ai/guides/oxford-mba'
   },
-  paymentLink: 'https://market.edutu.ai/guides/oxford-mba'
-},
-{
-  id: 'sample-data-science',
-  title: 'Pivot to Senior Data Scientist',
-  description: 'Isaac moved from support specialist to senior data science through night classes and ML projects.',
+  {
+    id: 'sample-data-science',
+    title: 'Pivot to Senior Data Scientist',
+    description: 'Isaac moved from support specialist to senior data science through night classes and ML projects.',
     creator: { name: 'Isaac Mensah', avatar: 'DS', title: 'Senior Data Scientist', verified: true },
     creatorEmail: 'isaac@edutu.ai',
     category: 'Programming',
@@ -199,73 +195,73 @@ const FALLBACK_ROADMAPS: CommunityRoadmap[] = [
     users: 1245,
     successRate: 68,
     tags: ['Python', 'ML', 'Career switch'],
-  achievements: ['Senior DS offer', 'Portfolio of 6 projects', 'Conference talk'],
-  price: 'Free',
-  image: 'https://images.pexels.com/photos/3861958/pexels-photo-3861958.jpeg',
-  featured: false,
-  status: 'approved',
-  type: 'roadmap',
-  lastUpdatedLabel: '1 week ago',
-  lastUpdatedTimestamp: Date.now() - 7 * 24 * 60 * 60 * 1000,
-  story:
-    'Isaac documents how he balanced a support role with night classes, project-based learning, and community showcases to become a senior data scientist. The guide includes weekly checkpoints and portfolio templates.',
-  resources: [
-    {
-      id: 'ds-res-1',
-      title: 'Night School ML Curriculum',
-      url: 'https://example.com/resources/night-ml',
-      type: 'course',
-      cost: 'free'
+    achievements: ['Senior DS offer', 'Portfolio of 6 projects', 'Conference talk'],
+    price: 'Free',
+    image: 'https://images.pexels.com/photos/3861958/pexels-photo-3861958.jpeg',
+    featured: false,
+    status: 'approved',
+    type: 'roadmap',
+    lastUpdatedLabel: '1 week ago',
+    lastUpdatedTimestamp: Date.now() - 7 * 24 * 60 * 60 * 1000,
+    story:
+      'Isaac documents how he balanced a support role with night classes, project-based learning, and community showcases to become a senior data scientist. The guide includes weekly checkpoints and portfolio templates.',
+    resources: [
+      {
+        id: 'ds-res-1',
+        title: 'Night School ML Curriculum',
+        url: 'https://example.com/resources/night-ml',
+        type: 'course',
+        cost: 'free'
+      },
+      {
+        id: 'ds-res-2',
+        title: 'Portfolio Project Rubric',
+        url: 'https://example.com/resources/ds-rubric',
+        type: 'tool',
+        cost: 'free'
+      },
+      {
+        id: 'ds-res-3',
+        title: 'Weekly Study Tracker',
+        url: 'https://example.com/resources/study-tracker',
+        type: 'tool',
+        cost: 'free'
+      }
+    ],
+    roadmap: [
+      {
+        id: 'ds-stage-1',
+        title: 'Weeks 1-6: Solidify Python & statistics',
+        description: 'Refresh Python, statistics, and SQL foundations with targeted exercises.',
+        duration: '6 weeks',
+        tasks: []
+      },
+      {
+        id: 'ds-stage-2',
+        title: 'Weeks 7-16: Build portfolio-ready ML projects',
+        description: 'Ship three end-to-end projects that demonstrate experimentation and storytelling.',
+        duration: '10 weeks',
+        tasks: []
+      },
+      {
+        id: 'ds-stage-3',
+        title: 'Weeks 17-24: Showcase & grow community proof',
+        description: 'Publish case studies, present at meetups, and prepare interview artifacts.',
+        duration: '8 weeks',
+        tasks: []
+      }
+    ],
+    stats: {
+      rating: 4.8,
+      users: 1245,
+      successRate: 68,
+      saves: 512,
+      adoptionCount: 402,
+      likes: 276,
+      comments: 81
     },
-    {
-      id: 'ds-res-2',
-      title: 'Portfolio Project Rubric',
-      url: 'https://example.com/resources/ds-rubric',
-      type: 'tool',
-      cost: 'free'
-    },
-    {
-      id: 'ds-res-3',
-      title: 'Weekly Study Tracker',
-      url: 'https://example.com/resources/study-tracker',
-      type: 'tool',
-      cost: 'free'
-    }
-  ],
-  roadmap: [
-    {
-      id: 'ds-stage-1',
-      title: 'Weeks 1-6: Solidify Python & statistics',
-      description: 'Refresh Python, statistics, and SQL foundations with targeted exercises.',
-      duration: '6 weeks',
-      tasks: []
-    },
-    {
-      id: 'ds-stage-2',
-      title: 'Weeks 7-16: Build portfolio-ready ML projects',
-      description: 'Ship three end-to-end projects that demonstrate experimentation and storytelling.',
-      duration: '10 weeks',
-      tasks: []
-    },
-    {
-      id: 'ds-stage-3',
-      title: 'Weeks 17-24: Showcase & grow community proof',
-      description: 'Publish case studies, present at meetups, and prepare interview artifacts.',
-      duration: '8 weeks',
-      tasks: []
-    }
-  ],
-  stats: {
-    rating: 4.8,
-    users: 1245,
-    successRate: 68,
-    saves: 512,
-    adoptionCount: 402,
-    likes: 276,
-    comments: 81
-  },
-  paymentLink: null
-}
+    paymentLink: null
+  }
 ];
 
 const CREATE_DEFAULTS: CreateRoadmapForm = {
@@ -519,52 +515,52 @@ const normaliseRoadmapStages = (value: unknown): CommunityRoadmapStage[] => {
         const tasks =
           Array.isArray(tasksRaw) && tasksRaw.length > 0
             ? tasksRaw
-                .map((task, taskIndex) => {
-                  if (task && typeof task === 'object') {
-                    const taskRecord = task as Record<string, unknown>;
-                    const taskTitle =
-                      typeof taskRecord.title === 'string' && taskRecord.title.trim().length > 0
-                        ? taskRecord.title.trim()
-                        : '';
-                    if (!taskTitle) {
-                      return null;
-                    }
+              .map((task, taskIndex) => {
+                if (task && typeof task === 'object') {
+                  const taskRecord = task as Record<string, unknown>;
+                  const taskTitle =
+                    typeof taskRecord.title === 'string' && taskRecord.title.trim().length > 0
+                      ? taskRecord.title.trim()
+                      : '';
+                  if (!taskTitle) {
+                    return null;
+                  }
 
-                    const taskDescription =
-                      typeof taskRecord.description === 'string' && taskRecord.description.trim().length > 0
-                        ? taskRecord.description.trim()
-                        : undefined;
+                  const taskDescription =
+                    typeof taskRecord.description === 'string' && taskRecord.description.trim().length > 0
+                      ? taskRecord.description.trim()
+                      : undefined;
 
-                    return {
-                      id:
-                        typeof taskRecord.id === 'string' && taskRecord.id.trim().length > 0
-                          ? taskRecord.id.trim()
-                          : createLocalId(`task-${index}`, taskIndex),
-                      title: taskTitle,
-                      description: taskDescription,
-                      duration:
-                        typeof taskRecord.duration === 'string' && taskRecord.duration.trim().length > 0
-                          ? taskRecord.duration.trim()
-                          : undefined,
-                      resourceIds: Array.isArray(taskRecord.resourceIds)
-                        ? (taskRecord.resourceIds.filter((id): id is string => typeof id === 'string') as string[])
+                  return {
+                    id:
+                      typeof taskRecord.id === 'string' && taskRecord.id.trim().length > 0
+                        ? taskRecord.id.trim()
+                        : createLocalId(`task-${index}`, taskIndex),
+                    title: taskTitle,
+                    description: taskDescription,
+                    duration:
+                      typeof taskRecord.duration === 'string' && taskRecord.duration.trim().length > 0
+                        ? taskRecord.duration.trim()
                         : undefined,
-                      outcome:
-                        typeof taskRecord.outcome === 'string' && taskRecord.outcome.trim().length > 0
-                          ? taskRecord.outcome.trim()
-                          : undefined
-                    };
-                  }
-                  if (typeof task === 'string' && task.trim().length > 0) {
-                    return {
-                      id: createLocalId(`task-${index}`, taskIndex),
-                      title: task.trim(),
-                      description: undefined
-                    };
-                  }
-                  return null;
-                })
-                .filter((task): task is CommunityRoadmapStage['tasks'][number] => Boolean(task))
+                    resourceIds: Array.isArray(taskRecord.resourceIds)
+                      ? (taskRecord.resourceIds.filter((id): id is string => typeof id === 'string') as string[])
+                      : undefined,
+                    outcome:
+                      typeof taskRecord.outcome === 'string' && taskRecord.outcome.trim().length > 0
+                        ? taskRecord.outcome.trim()
+                        : undefined
+                  };
+                }
+                if (typeof task === 'string' && task.trim().length > 0) {
+                  return {
+                    id: createLocalId(`task-${index}`, taskIndex),
+                    title: task.trim(),
+                    description: undefined
+                  };
+                }
+                return null;
+              })
+              .filter((task): task is CommunityRoadmapStage['tasks'][number] => Boolean(task))
             : [];
 
         return {
@@ -730,56 +726,46 @@ const mapListingToRoadmap = (payload: Record<string, unknown>, id: string): Comm
   };
 };
 
-const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onBack, onRoadmapSelect, user }) => {
+const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onRoadmapSelect, user, onBack }) => {
   const { isDarkMode } = useDarkMode();
   const { toast } = useToast();
 
-  const [ remoteRoadmaps, setRemoteRoadmaps ] = useState<CommunityRoadmap[]>([]);
-  const [ loadingRemote, setLoadingRemote ] = useState(true);
-  const [ hasRealtimeData, setHasRealtimeData ] = useState(false);
-  const [ searchTerm, setSearchTerm ] = useState('');
-  const [ categoryFilter, setCategoryFilter ] = useState<string>('All');
-  const [ typeFilter, setTypeFilter ] = useState<'all' | 'roadmap' | 'marketplace'>('all');
-  const [ priceFilter, setPriceFilter ] = useState<'all' | 'Free' | 'Premium'>('all');
-  const [ difficultyFilter, setDifficultyFilter ] = useState<'all' | 'Beginner' | 'Intermediate' | 'Advanced'>('all');
-  const [ tagFilter, setTagFilter ] = useState<string>('All');
-  const [ verifiedOnly, setVerifiedOnly ] = useState(false);
-  const [ sortOption, setSortOption ] = useState<SortOption>('Popular');
-  const [ showFilters, setShowFilters ] = useState(false);
-  const [ selectedRoadmap, setSelectedRoadmap ] = useState<CommunityRoadmap | null>(null);
-  const [ detailOpen, setDetailOpen ] = useState(false);
-  const [ createOpen, setCreateOpen ] = useState(false);
-  const [ submitting, setSubmitting ] = useState(false);
-  const [ submissionMessage, setSubmissionMessage ] = useState<string | null>(null);
-  const [ formState, setFormState ] = useState<CreateRoadmapForm>({ ...CREATE_DEFAULTS });
-  const [ likeLoading, setLikeLoading ] = useState(false);
-  const [ saveLoading, setSaveLoading ] = useState(false);
-  const [ adoptLoading, setAdoptLoading ] = useState(false);
+  const [remoteRoadmaps, setRemoteRoadmaps] = useState<CommunityRoadmap[]>([]);
+  const [loadingRemote, setLoadingRemote] = useState(true);
+  const [hasRealtimeData, setHasRealtimeData] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedRoadmap, setSelectedRoadmap] = useState<CommunityRoadmap | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [sortOption] = useState<SortOption>('Popular');
+  const [formState, setFormState] = useState<CreateRoadmapForm>({ ...CREATE_DEFAULTS });
+  const [isAddingRoadmap, setIsAddingRoadmap] = useState(false);
 
   useEffect(() => {
-    if (!db) {
-      setLoadingRemote(false);
-      setHasRealtimeData(false);
-      return;
-    }
-
-    const listener = onSnapshot(
-      query(collection(db, 'community_marketplace'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        const mapped = snapshot.docs.map((doc) =>
-          mapListingToRoadmap(doc.data() as Record<string, unknown>, doc.id)
-        );
-        setRemoteRoadmaps(mapped);
+    // Use Supabase/optimized implementation to fetch community stories
+    const fetchStories = async () => {
+      try {
+        setLoadingRemote(true);
+        // Fetch approved community roadmaps
+        const stories = await fetchCommunityStories({
+          status: 'approved',
+          type: 'roadmap'
+        });
+        const mappedStories = (stories || []).map(s => mapListingToRoadmap(s as any, s.id));
+        setRemoteRoadmaps(mappedStories);
         setHasRealtimeData(true);
-        setLoadingRemote(false);
-      },
-      () => {
-        setHasRealtimeData(false);
+      } catch (error) {
+        console.error('Error fetching community stories:', error);
+        // Optionally set error state here to show to the user
+      } finally {
         setLoadingRemote(false);
       }
-    );
+    };
 
-    return () => listener();
+    fetchStories();
   }, []);
 
   const combinedRoadmaps = hasRealtimeData && remoteRoadmaps.length > 0 ? remoteRoadmaps : FALLBACK_ROADMAPS;
@@ -824,11 +810,11 @@ const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onBack, onR
           case 'Newest':
             return b.lastUpdatedTimestamp - a.lastUpdatedTimestamp;
           case 'Highest Rated':
-            return b.rating - a.rating;
+            return ((b.stats?.rating || 0) - (a.stats?.rating || 0));
           case 'Most Used':
-            return b.users - a.users;
+            return ((b.stats?.users || 0) - (a.stats?.users || 0));
           default:
-            return Number(b.featured) - Number(a.featured) || b.successRate - a.successRate;
+            return Number(b.featured) - Number(a.featured) || ((b.stats?.successRate || 0) - (a.stats?.successRate || 0));
         }
       });
   }, [approvedRoadmaps, categoryFilter, sortOption, searchTerm]);
@@ -868,40 +854,36 @@ const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onBack, onR
       return;
     }
 
-    if (!db) {
-      toast({
-        title: 'Submission unavailable',
-        description: 'Connect Firebase to enable community roadmap submissions.',
-        variant: 'error'
-      });
-      return;
-    }
-
     setSubmitting(true);
     try {
-      await addDoc(collection(db, 'community_marketplace'), {
+      // Prepare submission data in the format expected by the Supabase service
+      const submissionData = {
         title: trimmedTitle,
         summary: trimmedSummary,
         description: trimmedSummary,
         category: formState.category.trim() || 'Community',
         duration: formState.duration.trim() || 'Flexible',
         difficulty: formState.difficulty,
-        priceType: formState.price === 'Premium' ? 'premium' : 'free',
+        price: (formState.price === 'Premium' ? 'Premium' : 'Free') as CommunityStoryPrice, // Update to match CommunityStoryPrice
         successRate: Math.min(Math.max(Number.parseInt(formState.successRate || '60', 10), 1), 100),
         tags: toStringList(formState.tags),
         outcomes: toStringList(formState.outcomes),
         coverImage: formState.coverImage.trim() || null,
-        creatorName: user?.name ?? 'Anonymous learner',
-        creatorEmail: formState.creatorEmail.trim() || null,
-        creatorTitle: formState.creatorTitle.trim() || null,
-        type: 'roadmap',
-        status: 'pending',
+        creator: {
+          name: user?.name ?? 'Anonymous learner',
+          email: formState.creatorEmail.trim() || undefined,
+          title: formState.creatorTitle.trim() || undefined
+        },
+        type: 'roadmap' as const,
+        status: 'pending' as const,
         featured: false,
-        likes: 0,
-        submissions: 0,
-        users: 0,
-        createdAt: serverTimestamp()
-      });
+        resources: [],
+        roadmap: [],
+        story: trimmedSummary
+      };
+
+      // Submit using the Supabase implementation
+      await submitCommunityStory(submissionData);
 
       setCreateOpen(false);
       resetForm();
@@ -922,362 +904,490 @@ const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onBack, onR
     }
   };
 
-  const { themeClass } = useMemo(() => ({ themeClass: isDarkMode ? 'dark' : '' }), [isDarkMode]);
+  const handleOpenDetail = (roadmap: CommunityRoadmap) => {
+    setSelectedRoadmap(roadmap);
+    setDetailOpen(true);
+  };
 
-  const displayRoadmaps = filteredRoadmaps;
+  const handleGetRoadmap = async (roadmap: CommunityRoadmap) => {
+    if (isAddingRoadmap) return;
+    setIsAddingRoadmap(true);
+    try {
+      await onRoadmapSelect(roadmap);
+      setDetailOpen(false);
+    } catch (error) {
+      console.error('Failed to add roadmap:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add roadmap. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setIsAddingRoadmap(false);
+    }
+  };
+
 
   return (
-    <div className={`min-h-screen bg-white transition-theme dark:bg-gray-900 ${themeClass}`}>
-      <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onBack}
-            className="p-2 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-          >
-            <ArrowLeft size={18} />
-          </Button>
-          <div className="flex-1">
-            <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
-              <Globe size={22} className="text-primary" />
-              Community Marketplace
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Submit your roadmap and explore stories the admin team has approved for learners.
-            </p>
-          </div>
-        </div>
-        <div className="mx-auto max-w-4xl px-4 pb-4">
-          <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search roadmaps, creators, or topics"
-              className="w-full rounded-2xl border-gray-200 pl-9 pr-12 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-950 text-white' : 'bg-white text-slate-900'} font-body transition-colors duration-300`}>
+      {/* Page Header */}
+      <PageHeader
+        title="Community Marketplace"
+        subtitle="Discover proven career trajectories shared by the Edutu community"
+        onBack={onBack}
+      />
+
+      <div className="max-w-7xl mx-auto px-6 pt-6 pb-24 space-y-8 relative z-10">
+
+        {/* Search & Filter Controls */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 relative group">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors">
+                <Search size={18} />
+              </div>
+              <input
+                type="text"
+                placeholder="Search roadmaps, careers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-subtle bg-surface-layer/50 dark:bg-gray-900 shadow-sm text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all font-medium text-sm"
+              />
+            </div>
             <button
-              type="button"
-              onClick={() => setShowFilters((value) => !value)}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 transition ${
-                showFilters
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
-              }`}
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-3 rounded-xl transition-all shadow-sm border ${showFilters
+                ? 'bg-brand-500 text-white border-brand-500'
+                : 'bg-white dark:bg-gray-900 text-slate-600 dark:text-slate-400 border-subtle hover:border-brand-500/30'
+                }`}
             >
-              <Filter size={14} />
+              <Filter size={20} />
             </button>
           </div>
+
+          {/* Collapsible Filters */}
           {showFilters && (
-            <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {categories.map((category) => (
-                      <Button
-                        key={category}
-                        type="button"
-                        size="sm"
-                        variant={categoryFilter === category ? 'primary' : 'secondary'}
-                        onClick={() => {
-                          setCategoryFilter(category);
-                          setShowFilters(false);
-                        }}
-                      >
-                        {category}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sort</p>
-                  <Select
-                    value={sortOption}
-                    onChange={(event) => setSortOption(event.target.value as SortOption)}
-                    className="mt-2 w-full"
+            <div className="p-1 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide w-full">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat)}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all whitespace-nowrap border ${categoryFilter === cat
+                      ? 'bg-slate-900 text-white border-slate-900 dark:bg-brand-600 dark:border-brand-600'
+                      : 'bg-white dark:bg-gray-900 text-slate-500 border-subtle hover:text-slate-900 dark:hover:text-white'
+                      }`}
                   >
-                    <option value="Popular">Popular</option>
-                    <option value="Newest">Newest</option>
-                    <option value="Highest Rated">Highest rated</option>
-                    <option value="Most Used">Most used</option>
-                    <option value="Free Only">Free only</option>
-                  </Select>
-                </div>
+                    {cat}
+                  </button>
+                ))}
               </div>
             </div>
           )}
         </div>
-      </header>
 
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6">
-        {submissionMessage && (
-          <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
-            {submissionMessage}
-          </div>
-        )}
+        {/* Redesigned Success Trajectory Banner Card */}
+        <div
+          onClick={() => setCreateOpen(true)}
+          className="stat-card stat-card-purple group cursor-pointer p-6 md:p-10 relative overflow-hidden"
+        >
+          <div className="stat-card-edge" />
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex-1 space-y-4 text-center md:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 dark:bg-white/10 border border-white/20 backdrop-blur-md">
+                <Sparkles size={14} className="text-white" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white">Community Edition</span>
+              </div>
+              <h3 className="text-3xl font-display font-bold text-white leading-tight">
+                Share Your Success <br className="hidden md:block" /> Trajectory
+              </h3>
+              <p className="text-base text-white/80 font-medium max-w-xl leading-relaxed">
+                Publish your career journey and help thousands of learners follow your proven path to success.
+              </p>
+            </div>
 
-        {loadingRemote && (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-            Syncing the latest community submissions...
+            <Button
+              variant="secondary"
+              className="bg-white text-brand-600 hover:bg-slate-50 rounded-2xl px-10 py-5 h-auto font-black shadow-xl shadow-brand-500/10 group-hover:scale-105 transition-transform"
+            >
+              <Plus size={20} className="mr-2" />
+              Publish Now
+            </Button>
           </div>
-        )}
 
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Approved roadmaps</h2>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{filteredRoadmaps.length} published</span>
+          <div className="absolute right-[-20px] bottom-[-20px] opacity-10 group-hover:opacity-20 transition-opacity">
+            <Sparkles size={120} className="text-white rotate-12" />
           </div>
-          {filteredRoadmaps.length === 0 ? (
-            <Card className="border border-dashed border-gray-300 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-300">
-              No roadmaps match your filters yet. Try adjusting the search or submit your own success story.
-            </Card>
+        </div>
+
+        {/* Refined Grid */}
+        <div className="space-y-8">
+          <div className="flex items-center gap-4">
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Featured Roadmaps</h2>
+            <div className="h-px flex-1 bg-subtle" />
+          </div>
+
+          {loadingRemote ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="h-[400px] rounded-2xl animate-pulse bg-surface-layer border border-subtle" />
+              ))}
+            </div>
           ) : (
-            filteredRoadmaps.map((roadmap) => (
-              <Card
-                key={roadmap.id}
-                className="border border-gray-200 transition hover:border-primary/40 dark:border-gray-700"
-                onClick={() => onRoadmapSelect(roadmap)}
-              >
-                <div className="flex flex-col gap-4 md:flex-row">
-                  <img
-                    src={roadmap.image}
-                    alt={roadmap.title}
-                    className="h-24 w-full rounded-xl object-cover md:h-28 md:w-32"
-                  />
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{roadmap.title}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{roadmap.description}</p>
-                      </div>
-                      <span className="rounded-full border border-gray-200 px-2 py-1 text-xs text-gray-500 dark:border-gray-600 dark:text-gray-300">
-                        {roadmap.price}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <Tag size={12} />
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+              {filteredRoadmaps.map((roadmap) => (
+                <div
+                  key={roadmap.id}
+                  onClick={() => handleOpenDetail(roadmap)}
+                  className="group flex flex-col bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-subtle hover:border-brand-500/50 hover:shadow-xl hover:shadow-brand-500/5 transition-all duration-300 cursor-pointer"
+                >
+                  {/* Card Media */}
+                  <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    <img
+                      src={roadmap.image}
+                      alt={roadmap.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute top-4 left-4">
+                      <div className="px-3 py-1.5 rounded-lg bg-white/90 dark:bg-gray-900/90 backdrop-blur-md text-[10px] font-bold uppercase tracking-wider shadow-sm border border-white/20">
                         {roadmap.category}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        {roadmap.duration}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users size={12} />
-                        {roadmap.users.toLocaleString()} learners
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Star size={12} />
-                        {roadmap.rating.toFixed(1)}
-                      </span>
-                      <span>{roadmap.lastUpdatedLabel}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {roadmap.tags.slice(0, 4).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-500 dark:border-gray-600 dark:text-gray-300"
-                        >
-                          {tag}
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-6 flex-1 flex flex-col space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-slate-100 dark:bg-white/5 overflow-hidden flex items-center justify-center font-bold text-[10px] border border-subtle">
+                          {(roadmap.creator?.avatar && roadmap.creator.avatar.length <= 3) ? roadmap.creator.avatar : <Users size={10} />}
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-tight">
+                          {roadmap.creator?.name || 'Anonymous'}
                         </span>
-                      ))}
+                      </div>
+                      <div className="flex items-center gap-1 text-amber-500 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-md">
+                        <Star size={10} fill="currentColor" />
+                        <span className="text-[10px] font-bold">{(roadmap.stats?.rating ?? 0).toFixed(1)}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1 text-xs text-gray-500 dark:text-gray-400">
-                      {roadmap.achievements.slice(0, 3).map((achievement) => (
-                        <span key={achievement} className="flex items-center gap-1">
-                          <CheckCircle size={12} className="text-green-500" />
-                          {achievement}
-                        </span>
-                      ))}
+
+                    <h3 className="text-xl font-bold leading-tight group-hover:text-brand-600 transition-colors line-clamp-2">
+                      {roadmap.title}
+                    </h3>
+
+                    <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed font-medium">
+                      {roadmap.description}
+                    </p>
+
+                    <div className="mt-auto pt-4 flex items-center justify-between border-t border-subtle">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Users size={14} />
+                          <span className="text-xs font-bold">{(roadmap.stats?.users ?? 0).toLocaleString()}</span>
+                        </div>
+                        <div className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-white/5 text-[10px] font-bold uppercase tracking-wider text-slate-500 border border-subtle">
+                          {roadmap.difficulty}
+                        </div>
+                      </div>
+                      <div className="text-xs font-bold text-brand-600 dark:text-brand-400">
+                        {roadmap.price}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </Card>
-            ))
+              ))}
+            </div>
           )}
-        </section>
+        </div>
+      </div>
 
-        <section>
-          <Card className="border border-primary/30 bg-gradient-to-r from-primary/10 to-accent/10 dark:border-primary/40 dark:from-primary/20 dark:to-accent/20">
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white">
-                <Plus size={20} />
+      {/* Immersive Full-Page Roadmap Detail View */}
+      {detailOpen && selectedRoadmap && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-gray-950 overflow-y-auto animate-in slide-in-from-right duration-500 fill-mode-forwards scrollbar-hide">
+          {/* Immersive Hero Header */}
+          <div className="relative h-[45vh] md:h-[55vh] w-full shrink-0">
+            <img
+              src={selectedRoadmap.image}
+              alt={selectedRoadmap.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/20 to-transparent" />
+
+            {/* Navigation Header */}
+            <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between z-10">
+              <button
+                onClick={() => setDetailOpen(false)}
+                className="p-3 rounded-2xl bg-black/20 hover:bg-black/40 text-white backdrop-blur-xl border border-white/10 transition-all active:scale-90"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div className="flex gap-2">
+                <button className="p-3 rounded-2xl bg-black/20 text-white backdrop-blur-xl border border-white/10">
+                  <Star size={20} />
+                </button>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Share your success story</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Submit a roadmap for review. The admin team will approve it before it becomes visible in the marketplace.
-              </p>
-              <Button type="button" className="mt-4 inline-flex items-center gap-2" onClick={() => setCreateOpen(true)}>
-                <Plus size={16} />
-                Create roadmap
+            </div>
+
+            {/* Hero Content */}
+            <div className="absolute bottom-10 left-6 right-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 rounded-lg bg-brand-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-brand-500/20">
+                  {selectedRoadmap.category}
+                </span>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10">
+                  <Clock size={12} />
+                  {selectedRoadmap.duration}
+                </div>
+              </div>
+              <h1 className="text-3xl md:text-5xl font-display font-bold text-white leading-[1.1] tracking-tight">
+                {selectedRoadmap.title}
+              </h1>
+              <div className="flex items-center gap-4 pt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-brand-500/20 border border-brand-500/30 overflow-hidden flex items-center justify-center font-bold text-xs text-brand-400">
+                    {(selectedRoadmap.creator?.avatar && selectedRoadmap.creator.avatar.length <= 3) ? selectedRoadmap.creator.avatar : <Users size={16} />}
+                  </div>
+                  <span className="text-sm font-bold text-white/90">{selectedRoadmap.creator?.name}</span>
+                </div>
+                <div className="w-1 h-1 rounded-full bg-white/30" />
+                <div className="flex items-center gap-1.5 text-amber-400">
+                  <Star size={16} fill="currentColor" />
+                  <span className="text-sm font-black">{selectedRoadmap.rating.toFixed(1)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Content Area */}
+          <div className="max-w-4xl mx-auto px-6 py-12 space-y-16 pb-32">
+            {/* Overview / Story Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+                  <Info size={20} />
+                </div>
+                <h3 className="text-xl font-display font-bold">Trajectory Overview</h3>
+              </div>
+              <div className="prose prose-slate dark:prose-invert max-w-none">
+                <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                  {selectedRoadmap.story || selectedRoadmap.description}
+                </p>
+              </div>
+
+              {/* Quick Stats Banner */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                {[
+                  { label: 'Difficulty', value: selectedRoadmap.difficulty, icon: <BarChart size={16} /> },
+                  { label: 'Learners', value: selectedRoadmap.users.toLocaleString(), icon: <Users size={16} /> },
+                  { label: 'Success Rate', value: `${selectedRoadmap.successRate}%`, icon: <Sparkles size={16} /> },
+                  { label: 'Access', value: selectedRoadmap.price, icon: <BookOpen size={16} /> }
+                ].map((stat) => (
+                  <div key={stat.label} className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-subtle flex flex-col gap-2">
+                    <div className="text-slate-400">{stat.icon}</div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{stat.label}</p>
+                      <p className="font-bold text-slate-900 dark:text-white">{stat.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Immersive Timeline Section */}
+            <div className="space-y-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-brand-500/10 text-brand-500">
+                    <BookOpen size={20} />
+                  </div>
+                  <h3 className="text-xl font-display font-bold">Step-by-Step Curriculum</h3>
+                </div>
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  {selectedRoadmap.roadmap?.length || 0} Phases
+                </span>
+              </div>
+
+              <div className="relative space-y-12 before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-brand-500 before:via-indigo-500 before:to-slate-200 dark:before:to-slate-800">
+                {selectedRoadmap.roadmap?.map((stage, idx) => (
+                  <div key={stage.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
+                    {/* Dot Icon */}
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white dark:border-gray-950 bg-white dark:bg-gray-900 shadow-xl z-10 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 transition-transform group-hover:scale-125">
+                      <div className="w-3 h-3 rounded-full bg-brand-500 animate-pulse" />
+                    </div>
+                    {/* Card */}
+                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-6 rounded-3xl bg-white dark:bg-gray-900 border border-subtle shadow-sm hover:shadow-xl hover:border-brand-500/30 transition-all duration-300">
+                      <div className="flex items-center justify-between mb-3 text-brand-500">
+                        <span className="text-[10px] font-black uppercase tracking-widest">Phase {idx + 1}</span>
+                        {stage.duration && <span className="text-[10px] font-bold py-1 px-2 rounded-lg bg-brand-500/10">{stage.duration}</span>}
+                      </div>
+                      <h4 className="text-lg font-bold mb-2 text-slate-900 dark:text-white leading-tight">{stage.title}</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                        {stage.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Resources Grid */}
+            {selectedRoadmap.resources && selectedRoadmap.resources.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-accent-500/10 text-accent-500">
+                    <ExternalLink size={20} />
+                  </div>
+                  <h3 className="text-xl font-display font-bold">Bundle Resources</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {selectedRoadmap.resources.map((resource) => (
+                    <div key={resource.id} className="group p-5 rounded-2xl bg-white dark:bg-gray-900 border border-subtle hover:border-accent-500/30 transition-all cursor-pointer">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 group-hover:bg-accent-500 group-hover:text-white transition-colors">
+                          <BookOpen size={20} />
+                        </div>
+                        <ExternalLink size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <h5 className="font-bold text-slate-900 dark:text-white mb-1">{resource.title}</h5>
+                      <p className="text-xs text-slate-500 font-medium capitalize line-clamp-1">{resource.type || 'Resource'} • {resource.cost || 'Access'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Bottom Action Bar */}
+          <div className="fixed bottom-0 left-0 right-0 p-6 md:p-8 bg-white/80 dark:bg-gray-950/80 backdrop-blur-2xl border-t border-subtle z-50">
+            <div className="max-w-4xl mx-auto">
+              <Button
+                onClick={() => handleGetRoadmap(selectedRoadmap)}
+                disabled={isAddingRoadmap}
+                className="w-full rounded-2xl py-5 h-auto text-lg font-black shadow-2xl shadow-brand-500/30 bg-gradient-to-r from-brand-600 to-indigo-600 hover:scale-[1.02] transition-transform text-white flex items-center justify-center gap-4"
+              >
+                {isAddingRoadmap ? (
+                  <>
+                    <RefreshCw size={24} className="animate-spin" />
+                    Forging Your New Path...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={24} />
+                    Get This Trajectory
+                  </>
+                )}
               </Button>
             </div>
-          </Card>
-        </section>
-      </main>
+          </div>
+        </div>
+      )}
 
+      {/* Simplified Submit Dialog */}
+      {/* Simplified Submit Dialog */}
       <Dialog
         open={createOpen}
         onOpenChange={(open) => {
           if (submitting) return;
           setCreateOpen(open);
-          if (!open) {
-            resetForm();
-          }
+          if (!open) resetForm();
         }}
       >
-        <DialogContent preventCloseOnBackdropClick={submitting} className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Share your success story</DialogTitle>
-            <DialogDescription>
-              Tell us about the roadmap or offer you created. An admin will review the submission before it appears in the marketplace.
-            </DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={handleCreateRoadmap}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Title</label>
-                <Input
-                  value={formState.title}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
-                  placeholder="From intern to senior product manager"
-                  required
-                />
+        <DialogContent preventCloseOnBackdropClick={submitting} className="max-w-xl rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+          <div className="p-6 border-b border-subtle flex items-center justify-between bg-white dark:bg-gray-900">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                <Sparkles size={20} />
               </div>
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</label>
-                <Input
-                  value={formState.category}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, category: event.target.value }))}
-                  placeholder="Programming, Business, Education..."
-                />
+                <h2 className="text-lg font-bold">Publish Roadmap</h2>
+                <p className="text-xs text-slate-400 font-medium">Share your success trajectory with the community</p>
               </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Short summary</label>
-              <Textarea
-                rows={4}
-                value={formState.summary}
-                onChange={(event) => setFormState((prev) => ({ ...prev, summary: event.target.value }))}
-                placeholder="What did you accomplish and how can learners follow this roadmap?"
+          </div>
+
+          <form onSubmit={handleCreateRoadmap} className="p-6 space-y-5 bg-white dark:bg-gray-900 max-h-[80vh] overflow-y-auto">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Roadmap Title</label>
+              <Input
+                value={formState.title}
+                onChange={(e) => setFormState(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g. Frontend Engineering Mastery"
+                className="rounded-xl border border-subtle bg-slate-50 dark:bg-white/5 py-3 px-4 font-medium text-sm"
                 required
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</label>
-                <Input
-                  value={formState.duration}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, duration: event.target.value }))}
-                  placeholder="e.g. 9 months"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Difficulty</label>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Category</label>
                 <Select
-                  value={formState.difficulty}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      difficulty: event.target.value as CreateRoadmapForm['difficulty']
-                    }))
-                  }
+                  value={formState.category}
+                  onChange={(e) => setFormState(prev => ({ ...prev, category: e.target.value }))}
+                  className="rounded-xl border border-subtle bg-slate-50 dark:bg-white/5 h-11 px-4 font-medium text-sm"
                 >
-                  <option value="Beginner">Beginner</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Advanced">Advanced</option>
+                  <option>Programming</option>
+                  <option>Business</option>
+                  <option>Education</option>
+                  <option>Creative</option>
+                  <option>Lifestyle</option>
                 </Select>
               </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Price</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Difficulty</label>
+                <Select
+                  value={formState.difficulty}
+                  onChange={(e) => setFormState(prev => ({ ...prev, difficulty: e.target.value as any }))}
+                  className="rounded-xl border border-subtle bg-slate-50 dark:bg-white/5 h-11 px-4 font-medium text-sm"
+                >
+                  <option>Beginner</option>
+                  <option>Intermediate</option>
+                  <option>Advanced</option>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Objectives Overview</label>
+              <Textarea
+                rows={4}
+                value={formState.summary}
+                onChange={(e) => setFormState(prev => ({ ...prev, summary: e.target.value }))}
+                placeholder="Define the impact of this trajectory..."
+                className="rounded-xl border border-subtle bg-slate-50 dark:bg-white/5 py-3 px-4 font-medium text-sm resize-none"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Duration</label>
+                <Input
+                  value={formState.duration}
+                  onChange={(e) => setFormState(prev => ({ ...prev, duration: e.target.value }))}
+                  placeholder="e.g. 12 Months"
+                  className="rounded-xl border border-subtle bg-slate-50 dark:bg-white/5 py-3 px-4 font-medium text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Price Tier</label>
                 <Select
                   value={formState.price}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, price: event.target.value as CreateRoadmapForm['price'] }))
-                  }
+                  onChange={(e) => setFormState(prev => ({ ...prev, price: e.target.value as any }))}
+                  className="rounded-xl border border-subtle bg-slate-50 dark:bg-white/5 h-11 px-4 font-medium text-sm"
                 >
                   <option value="Free">Free</option>
                   <option value="Premium">Premium</option>
                 </Select>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Success rate (%)</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={formState.successRate}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, successRate: event.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Cover image URL</label>
-                <Input
-                  value={formState.coverImage}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, coverImage: event.target.value }))}
-                  placeholder="Optional image to spotlight your story"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Key outcomes (comma separated)</label>
-                <Textarea
-                  rows={3}
-                  value={formState.outcomes}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, outcomes: event.target.value }))}
-                  placeholder="Promotion to senior engineer, Published research paper, Scholarship award"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Tags (comma separated)</label>
-                <Textarea
-                  rows={3}
-                  value={formState.tags}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, tags: event.target.value }))}
-                  placeholder="Leadership, Scholarships, Remote work"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Your role or title</label>
-                <Input
-                  value={formState.creatorTitle}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, creatorTitle: event.target.value }))}
-                  placeholder="Lead product manager at Edutu"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Contact email (optional)</label>
-                <Input
-                  type="email"
-                  value={formState.creatorEmail}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, creatorEmail: event.target.value }))}
-                  placeholder="We will notify you once approved"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  if (submitting) return;
-                  setCreateOpen(false);
-                  resetForm();
-                }}
-                disabled={submitting}
-              >
+
+            <DialogFooter className="pt-4 flex items-center gap-3">
+              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)} disabled={submitting} className="flex-1 rounded-xl py-3 h-auto font-bold text-sm">
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Submitting...' : 'Submit for review'}
+              <Button type="submit" disabled={submitting} className="flex-1 rounded-xl py-3 h-auto font-bold text-sm">
+                {submitting ? 'Publishing...' : 'Publish Now'}
               </Button>
             </DialogFooter>
           </form>
@@ -1286,5 +1396,6 @@ const CommunityMarketplace: React.FC<CommunityMarketplaceProps> = ({ onBack, onR
     </div>
   );
 };
+
 
 export default CommunityMarketplace;

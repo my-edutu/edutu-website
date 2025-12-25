@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from 'react';
+﻿import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Award,
   Bell,
@@ -6,27 +6,25 @@ import {
   CheckCircle2,
   ChevronRight,
   Globe,
-  Menu,
   MessageCircle,
-  Plus,
+  Settings,
   Target,
   TrendingUp,
-  Upload,
-  Users,
-  FileText,
-  X,
-  RefreshCw
+  Sparkles,
+  Users
 } from 'lucide-react';
-import Card from './ui/Card';
 import Button from './ui/Button';
+import { SkeletonStatsCard, SkeletonCard } from './ui/Skeleton';
+import { EmptyOpportunities } from './ui/EmptyState';
 import NotificationInbox from './NotificationInbox';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoals } from '../hooks/useGoals';
 import { useOpportunities } from '../hooks/useOpportunities';
 import { usePersonalizedOpportunities } from '../hooks/usePersonalizedOpportunities';
-import { taskTrackingService } from '../services/taskTrackingService';
+import { useUserStats } from '../hooks/useUserStats';
 import type { AppUser } from '../types/user';
 import type { OnboardingProfileData } from '../types/onboarding';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardProps {
   user: AppUser | null;
@@ -40,7 +38,11 @@ interface DashboardProps {
   onRedoOnboarding?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({
+export interface DashboardRef {
+  refreshOpportunities: () => void;
+}
+
+const Dashboard = React.forwardRef<DashboardRef, DashboardProps>(function Dashboard({
   user,
   onOpportunityClick,
   onViewAllOpportunities,
@@ -48,934 +50,535 @@ const Dashboard: React.FC<DashboardProps> = ({
   onNavigate,
   onAddGoal,
   onViewAllGoals,
-  onboardingProfile,
-  onRedoOnboarding
-}) => {
+  onboardingProfile
+}, ref) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount] = useState(3);
-  const [showMenu, setShowMenu] = useState(false);
   const { isDarkMode } = useDarkMode();
   const { goals } = useGoals();
+  const opportunitiesRefreshRef = useRef<() => void>();
+  const { t } = useTranslation();
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (showMenu && !target.closest('.dashboard-menu')) {
-        setShowMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showMenu]);
+  // Real-time user statistics
+  const userStats = useUserStats(user?.id);
 
   const getRandomQuote = () => {
     const quotes = [
-      "Success is the sum of small efforts repeated day in and day out. - Robert Collier",
-      "The only way to do great work is to love what you do. - Steve Jobs",
-      "Don't watch the clock; do what it does. Keep going. - Sam Levenson",
-      "Believe you can and you're halfway there. - Theodore Roosevelt",
-      "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-      "It does not matter how slowly you go as long as you do not stop. - Confucius",
-      "Everything you've ever wanted is on the other side of fear. - George Addair",
-      "Success is not final, failure is not fatal: It is the courage to continue that counts. - Winston Churchill",
-      "The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
-      "You are never too old to set another goal or to dream a new dream. - C.S. Lewis",
-      "The secret of getting ahead is getting started. - Mark Twain",
-      "The harder I work, the more luck I seem to have. - Thomas Jefferson",
-      "The way to get started is to quit talking and begin doing. - Walt Disney",
-      "Don't let yesterday take up too much of today. - Will Rogers",
-      "The journey of a thousand miles begins with one step. - Lao Tzu"
+      "Success is the sum of small efforts repeated day in and day out.",
+      "The only way to do great work is to love what you do.",
+      "Don't watch the clock; do what it does. Keep going.",
+      "Believe you can and you're halfway there.",
+      "The future belongs to those who believe in the beauty of their dreams."
     ];
-    
     return quotes[Math.floor(Math.random() * quotes.length)];
   };
 
   const getGreetingMessage = (name: string) => {
-    const currentHour = new Date().getHours();
-    
-    let timeGreeting = '';
-    if (currentHour >= 5 && currentHour < 12) {
-      timeGreeting = 'Good morning';
-    } else if (currentHour >= 12 && currentHour < 17) {
-      timeGreeting = 'Good afternoon';
-    } else if (currentHour >= 17 && currentHour < 21) {
-      timeGreeting = 'Good evening';
-    } else {
-      timeGreeting = 'Good night';
-    }
-    
-    const greetingVariations = [
-      `${timeGreeting}, ${name}!`,
-      `Hello, ${name}!`,
-      `Hey, ${name}!`,
-      `Greetings, ${name}!`,
-      `Welcome back, ${name}!`,
-      `Hello again, ${name}!`,
-      `${timeGreeting}!`,
-      `Hello, ${name}!`,
-      `Hey, ${name}!`
-    ];
-    
-    return greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
+    const hour = new Date().getHours();
+    if (hour < 12) return `${t('dashboard.greeting.morning')}, ${name}`;
+    if (hour < 17) return `${t('dashboard.greeting.afternoon')}, ${name}`;
+    if (hour < 21) return `${t('dashboard.greeting.evening')}, ${name}`;
+    return `${t('dashboard.greeting.night')}, ${name}`;
   };
 
   const {
     data: opportunityFeed,
     loading: opportunitiesLoading,
-    error: opportunitiesError,
-    refresh: refreshOpportunities,
-    setUserProfile: setOpportunityUserProfile
+    refresh: hookRefreshOpportunities
   } = onboardingProfile
-    ? usePersonalizedOpportunities()
-    : { ...useOpportunities(), setUserProfile: undefined };
+      ? usePersonalizedOpportunities()
+      : useOpportunities();
+
+  useEffect(() => {
+    opportunitiesRefreshRef.current = hookRefreshOpportunities;
+  }, [hookRefreshOpportunities]);
 
   const featuredOpportunities = useMemo(() => {
-    // Use personalized opportunities if available, otherwise regular opportunities
-    if (onboardingProfile && Array.isArray(opportunityFeed)) {
-      // If opportunityFeed contains match scores, return opportunities with match scores
-      return opportunityFeed.map(item => {
-        if ('opportunity' in item && 'matchScore' in item) {
-          // Return the opportunity with the match score attached
-          return {
-            ...item.opportunity,
-            matchScore: item.matchScore
-          };
-        }
-        // For regular opportunities, return as is
+    if (Array.isArray(opportunityFeed)) {
+      return opportunityFeed.slice(0, 3).map(item => {
+        if ('opportunity' in item) return item.opportunity;
         return item;
-      }).slice(0, 3);
+      });
     }
-
-    // For non-personalized feed, return the data directly
-    return (opportunityFeed as any[]).slice(0, 3);
-  }, [opportunityFeed, onboardingProfile]);
-
-  // Set user profile when onboarding data is available
-  useEffect(() => {
-    if (user && onboardingProfile && setOpportunityUserProfile) {
-      // Format onboarding data for recommendations
-      const userPreferences = {
-        interests: onboardingProfile.interests,
-        location: onboardingProfile.location,
-        careerGoals: onboardingProfile.goals,
-        experienceLevel: onboardingProfile.experience,
-        preferredCategories: [onboardingProfile.courseOfStudy],
-        availability: 'flexible'
-      };
-
-      setOpportunityUserProfile(user, undefined, userPreferences);
-    }
-  }, [user, onboardingProfile, setOpportunityUserProfile]);
-
-  const formatDateShort = (deadline?: string) => {
-    if (!deadline) {
-      return 'No deadline';
-    }
-    const parsed = new Date(deadline);
-    if (Number.isNaN(parsed.getTime())) {
-      return 'No deadline';
-    }
-    return parsed.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const describeDueDate = (deadline?: string) => {
-    if (!deadline) {
-      return 'No deadline';
-    }
-    const parsed = new Date(deadline);
-    if (Number.isNaN(parsed.getTime())) {
-      return 'No deadline';
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diffDays = Math.round(
-      (parsed.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    if (diffDays > 1) {
-      return `Due in ${diffDays} days`;
-    }
-    if (diffDays === 1) {
-      return 'Due tomorrow';
-    }
-    if (diffDays === 0) {
-      return 'Due today';
-    }
-    if (diffDays === -1) {
-      return 'Overdue by 1 day';
-    }
-    return `Overdue by ${Math.abs(diffDays)} days`;
-  };
-
-  const getPriorityBadgeClass = (priority?: string) => {
-    switch (priority) {
-      case 'high':
-        return 'border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300';
-      case 'medium':
-        return 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
-      case 'low':
-        return 'border-green-200 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300';
-      default:
-        return 'border-gray-200 bg-gray-100 text-gray-600 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300';
-    }
-  };
+    return [];
+  }, [opportunityFeed]);
 
   const formatUpdatedAt = (updatedAt: string) => {
-    const parsed = new Date(updatedAt);
-    if (Number.isNaN(parsed.getTime())) {
-      return '';
-    }
-    const diffMs = Date.now() - parsed.getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    if (diffMinutes < 1) {
-      return 'Moments ago';
-    }
-    if (diffMinutes < 60) {
-      return `${diffMinutes}m ago`;
-    }
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    }
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) {
-      return `${diffDays}d ago`;
-    }
-    return parsed.toLocaleDateString();
+    const diff = Date.now() - new Date(updatedAt).getTime();
+    const mins = Math.floor(diff / (1000 * 60));
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(updatedAt).toLocaleDateString();
   };
 
-  const orderedGoals = useMemo(() => {
-    const statusRank = (status: string) => {
-      if (status === 'active') return 0;
-      if (status === 'completed') return 1;
-      return 2;
-    };
-    const priorityRank = (priority?: string) => {
-      if (priority === 'high') return 0;
-      if (priority === 'medium') return 1;
-      if (priority === 'low') return 2;
-      return 3;
-    };
-
-    return [...goals]
-      .filter((goal) => goal.status !== 'archived')
-      .sort((a, b) => {
-        const statusDiff = statusRank(a.status) - statusRank(b.status);
-        if (statusDiff !== 0) return statusDiff;
-
-        const priorityDiff = priorityRank(a.priority) - priorityRank(b.priority);
-        if (priorityDiff !== 0) return priorityDiff;
-
-        const deadlineA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
-        const deadlineB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
-        if (deadlineA !== deadlineB) return deadlineA - deadlineB;
-
-        return a.progress - b.progress;
-      });
-  }, [goals]);
-
-  const focusGoals = useMemo(() => orderedGoals.slice(0, 3), [orderedGoals]);
-  const hasMoreGoals = orderedGoals.length > focusGoals.length;
-
-  const activeGoals = useMemo(() => goals.filter((goal) => goal.status === 'active'), [goals]);
-  const completedGoals = useMemo(() => goals.filter((goal) => goal.status === 'completed'), [goals]);
-  const openGoals = useMemo(() => goals.filter((goal) => goal.status !== 'archived'), [goals]);
-
-  const recentActivityCount = useMemo(() => {
-    const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
-    return goals.filter((goal) => new Date(goal.updatedAt).getTime() >= cutoff).length;
-  }, [goals]);
-
-  const consistencyScore = goals.length
-    ? Math.min(100, Math.round((recentActivityCount / goals.length) * 100))
-    : 0;
-
-  const averageProgress = activeGoals.length
-    ? Math.round(
-        activeGoals.reduce((total, goal) => total + goal.progress, 0) /
-          activeGoals.length
-      )
-    : 0;
-
-  const completionRate = openGoals.length
-    ? Math.round((completedGoals.length / openGoals.length) * 100)
-    : 0;
-
-  const goalCompletionWins = [...completedGoals]
-    .sort((a, b) => {
-      const aTime = new Date(a.completedAt ?? a.updatedAt).getTime();
-      const bTime = new Date(b.completedAt ?? b.updatedAt).getTime();
-      return bTime - aTime;
-    })
-    .map((goal) => ({
-      id: `goal-completed-${goal.id}`,
-      title: `Completed ${goal.title}`,
-      icon: <CheckCircle2 size={16} />,
-      date: formatUpdatedAt(goal.completedAt ?? goal.updatedAt),
-      type: 'goal_completed'
-    }));
-
-  const taskCompletionWins = taskTrackingService.getRecentCompletedTasks(5)
-    .map((task) => ({
-      id: task.id,
-      title: task.title,
-      icon: <CheckCircle2 size={16} />,
-      date: formatUpdatedAt(task.completedAt),
-      type: 'task_completed',
-      source: task.source
-    }));
-
-  // Combine goal completions and task completions, then sort by date
-  const allRecentWins = [...goalCompletionWins, ...taskCompletionWins]
-    .sort((a, b) => {
-      // Sort by most recent first
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    })
-    .slice(0, 5); // Take only the 5 most recent wins
-
-  const recentWins = allRecentWins;
-
-  const nextDeadlineGoal = useMemo(() => {
-    const withDeadline = activeGoals.filter((goal) => goal.deadline);
-    return withDeadline.sort(
-      (a, b) =>
-        new Date(a.deadline as string).getTime() - new Date(b.deadline as string).getTime()
-    )[0] ?? null;
-  }, [activeGoals]);
+  const activeGoals = useMemo(() => goals.filter((g) => g.status === 'active'), [goals]);
+  const completedGoals = useMemo(() => goals.filter((g) => g.status === 'completed'), [goals]);
+  const focusGoals = useMemo(() => activeGoals.slice(0, 3), [activeGoals]);
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <Target size={18} /> },
     { id: 'all-goals', label: 'All Goals', icon: <CheckCircle2 size={18} /> },
     { id: 'opportunities', label: 'Opportunities', icon: <Briefcase size={18} /> },
     { id: 'chat', label: 'AI Coach', icon: <MessageCircle size={18} /> },
-    { id: 'community-marketplace', label: 'Community Roadmaps', icon: <Globe size={18} /> },
-    { id: 'cv-management', label: 'CV Management', icon: <FileText size={18} /> },
-    { id: 'add-goal', label: 'Add Goal', icon: <Plus size={18} /> },
-    { id: 'profile', label: 'Profile', icon: <Users size={18} /> }
+    { id: 'settings', label: 'Settings', icon: <Settings size={18} /> }
   ];
 
-  const stats = useMemo(
-    () => [
+  // Real-time stats using the hook data
+  const stats = useMemo(() => {
+    const formatDeadline = () => {
+      if (!userStats.nextDeadline.date) return 'None';
+      return new Date(userStats.nextDeadline.date).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric'
+      });
+    };
+
+    const getDeadlineHelper = () => {
+      if (!userStats.nextDeadline.daysUntil && userStats.nextDeadline.daysUntil !== 0) {
+        return 'Set a target';
+      }
+      const days = userStats.nextDeadline.daysUntil;
+      if (days < 0) return 'Overdue!';
+      if (days === 0) return 'Due today!';
+      if (days === 1) return 'Due tomorrow';
+      return `Due in ${days} days`;
+    };
+
+    const getConsistencyHelper = () => {
+      if (userStats.consistency >= 80) return 'Momentum looks strong 🔥';
+      if (userStats.consistency >= 50) return 'Keep it going!';
+      if (userStats.consistency > 0) return 'Room to improve';
+      return 'Start tracking today';
+    };
+
+    return [
       {
-        label: 'Active goals',
-        value: activeGoals.length.toString(),
-        helper: `${completedGoals.length} completed / ${completionRate}% done`
+        label: t('dashboard.stats.goalsActive'),
+        value: userStats.activeGoals.toString(),
+        helper: `${userStats.completedGoals} ${t('dashboard.stats.completed').toLowerCase()}`
       },
       {
         label: 'Consistency',
-        value: `${consistencyScore}%`,
-        helper:
-          consistencyScore >= 70
-            ? 'Momentum looks strong'
-            : 'Aim for 70% consistency'
+        value: `${userStats.consistency}%`,
+        helper: getConsistencyHelper()
       },
       {
         label: 'Avg progress',
-        value: `${averageProgress}%`,
-        helper: activeGoals.length ? 'Across active goals' : 'Add a goal to start tracking'
+        value: `${userStats.avgProgress}%`,
+        helper: 'Across active goals'
       },
       {
         label: 'Next deadline',
-        value: nextDeadlineGoal ? formatDateShort(nextDeadlineGoal.deadline) : 'No deadline',
-        helper: nextDeadlineGoal
-          ? `${describeDueDate(nextDeadlineGoal.deadline)} · ${nextDeadlineGoal.title}`
-          : 'Add a deadline to stay on pace'
+        value: formatDeadline(),
+        helper: getDeadlineHelper()
       }
-    ],
-    [
-      activeGoals.length,
-      completedGoals.length,
-      completionRate,
-      consistencyScore,
-      averageProgress,
-      nextDeadlineGoal?.id,
-        nextDeadlineGoal?.deadline,
-        nextDeadlineGoal?.title
-      ]
-    );
+    ];
+  }, [userStats]);
 
-  const darkStatBackgrounds = [
-    'bg-gradient-to-br from-brand-500/35 via-brand-500/12 to-surface-layer/70 border-transparent ring-1 ring-brand-500/40 shadow-[0_32px_84px_-40px_rgba(79,70,229,0.75)]',
-    'bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-surface-layer/70 border-transparent ring-1 ring-emerald-400/35 shadow-[0_32px_84px_-40px_rgba(16,185,129,0.7)]',
-    'bg-gradient-to-br from-violet-500/30 via-violet-500/12 to-surface-layer/70 border-transparent ring-1 ring-violet-400/35 shadow-[0_32px_84px_-40px_rgba(129,140,248,0.75)]',
-    'bg-gradient-to-br from-amber-400/28 via-amber-500/12 to-surface-layer/70 border-transparent ring-1 ring-amber-300/35 shadow-[0_32px_84px_-40px_rgba(245,158,11,0.65)]'
-  ];
+  const recentWins = useMemo(() => {
+    const goalWins = completedGoals.map(g => ({
+      id: g.id,
+      title: `Completed ${g.title}`,
+      icon: <CheckCircle2 size={16} />,
+      date: formatUpdatedAt(g.updated_at)
+    }));
+    return goalWins.slice(0, 5);
+  }, [completedGoals]);
 
-  const handleAddGoal = () => {
-    if (onAddGoal) {
-      onAddGoal();
-    }
-  };
-
-  const handleViewAllGoalsClick = () => {
-    if (onViewAllGoals) {
-      onViewAllGoals();
-    }
-  };
-
-  const handleMenuItemClick = (itemId: string) => {
-    setShowMenu(false);
-    if (itemId === 'add-goal') {
-      handleAddGoal();
-      return;
-    }
-    if (itemId === 'all-goals') {
-      handleViewAllGoalsClick();
-      return;
-    }
-    if (itemId === 'opportunities') {
-      onViewAllOpportunities();
-      return;
-    }
-    if (onNavigate) {
-      onNavigate(itemId);
-    }
-  };
-
-  const headerTone = isDarkMode ? 'bg-gray-900/95 backdrop-blur border-gray-800' : 'bg-white border-slate-200';
-  const controlTone = isDarkMode ? 'border-white/10 text-white hover:bg-white/10' : 'border-slate-200 text-slate-600 hover:bg-slate-100';
-  const popupTone = isDarkMode ? 'bg-gray-900/95 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800';
-  const trayTone = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
-  const badgeTone = isDarkMode ? 'bg-white/10 text-white' : 'bg-primary/10 text-primary';
-  const navItemTone = isDarkMode ? 'text-gray-200 hover:text-white' : 'text-slate-600 hover:text-primary';
-
-  const handleCommunityMarketplace = () => {
-    if (onNavigate) {
-      onNavigate('community-marketplace');
-    }
-  };
-
-  const handleCVManagement = () => {
-    if (onNavigate) {
-      onNavigate('cv-management');
-    }
-  };
-
-  const handleViewMoreAchievements = () => {
-    if (onNavigate) {
-      onNavigate('achievements');
-    }
+  const handleMenuItemClick = (id: string) => {
+    if (onNavigate) onNavigate(id);
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} animate-fade-in`}>
-      <header className={`sticky top-0 z-30 border-b ${headerTone}`}>
-        <div className="px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 lg:gap-6">
-            <div className="flex shrink-0 items-center gap-3">
-              <svg viewBox="0 0 64 64" className="h-9 w-9" aria-hidden="true">
-                <path d="M32 8 6 19.5 32 31l26-11.5L32 8z" fill="#2c3192" />
-                <path d="M14 27v10.5C14 44 22.8 49.5 32 49.5S50 44 50 37.5V27l-18 8-18-8z" fill="#2c3192" opacity="0.85" />
-                <path d="M30 24h4v16l6-6 3 3-10 10-10-10 3-3 4 4V24z" fill="#1fb6aa" />
-              </svg>
-              <span className={`text-xl font-black tracking-tight sm:text-2xl ${isDarkMode ? 'text-white' : 'text-primary'}`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-950 text-white' : 'bg-slate-50 text-slate-900'} font-body transition-colors duration-500 overflow-x-hidden pb-12`}>
+      {/* Background Mesh Gradient */}
+      <div className="fixed inset-0 pointer-events-none opacity-30 dark:opacity-20 mesh-gradient" />
+
+      {/* Header */}
+      <header className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-all duration-300 ${isDarkMode ? 'bg-gray-950/80 border-white/5' : 'bg-white/80 border-slate-200'
+        }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 md:h-16">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-lg md:rounded-xl bg-gradient-to-tr from-brand-600 to-accent-500 shadow-lg shadow-brand-500/20">
+                <img src="/Edutu (4).jpg" alt="Logo" className="h-5 w-5 md:h-6 md:w-6 object-contain brightness-0 invert" />
+              </div>
+              <span className={`text-xl md:text-2xl font-display font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 edutu
               </span>
             </div>
-            <nav className="hidden flex-1 items-center justify-center gap-6 lg:flex">
+
+            <nav className="hidden md:flex items-center gap-1">
               {menuItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => handleMenuItemClick(item.id)}
-                  className={`text-sm font-semibold tracking-wide transition-colors ${navItemTone}`}
+                  className={`px-4 py-2 text-sm font-medium rounded-xl transition-all ${isDarkMode
+                    ? 'text-slate-400 hover:text-white hover:bg-white/5'
+                    : 'text-slate-600 hover:text-brand-600 hover:bg-brand-50'
+                    }`}
                 >
                   {item.label}
                 </button>
               ))}
             </nav>
-            <div className="ml-auto flex items-center gap-2">
+
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setShowNotifications(true)}
-                className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition-all ${controlTone}`}
-                aria-label="Open notifications"
+                className={`relative p-2.5 rounded-xl border transition-all ${isDarkMode
+                  ? 'border-white/5 bg-white/5 hover:bg-white/10 text-slate-300'
+                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                  }`}
               >
-                <Bell size={18} />
+                <Bell size={20} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
+                  <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-gray-950" />
                 )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowMenu((prev) => !prev)}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all ${controlTone}`}
-                aria-expanded={showMenu}
-                aria-controls="dashboard-menu-popup"
-                aria-label="Open navigation menu"
-              >
-                {showMenu ? <X size={18} /> : <Menu size={18} />}
               </button>
             </div>
           </div>
         </div>
       </header>
-        {/* Greeting and Daily Motivation Section */}
-        <div className="px-6 py-2">
-          <div
-            className={`rounded-3xl p-5 transition-theme ${
-              isDarkMode
-                ? 'bg-gradient-to-br from-brand-500/30 via-brand-500/8 to-surface-layer/80 border border-brand-500/25 shadow-[0_32px_84px_-42px_rgba(79,70,229,0.75)]'
-                : 'bg-white border border-gray-200 shadow-sm'
-            }`}
-          >
-            <h1 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              {getGreetingMessage(user?.name?.split(' ')[0] ?? 'there')}
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+        {/* Simplified Hero Greeting */}
+        <section className="mb-2 md:mb-8">
+          <div className="max-w-xl">
+            <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-1 md:mb-2">
+              {getGreetingMessage(user?.name?.split(' ')[0] ?? 'Explorer')}
             </h1>
-            <p className={`mt-2 text-sm ${isDarkMode ? 'text-slate-200/80' : 'text-gray-600'}`}>
+            <p className="text-base md:text-lg text-slate-500 dark:text-slate-400 font-medium italic line-clamp-2 md:line-clamp-none">
               "{getRandomQuote()}"
             </p>
           </div>
-        </div>
+        </section>
 
-      {showMenu && (
-        <div className="fixed inset-0 z-[60]">
-          <button
-            type="button"
-            onClick={() => setShowMenu(false)}
-            className="absolute inset-0"
-            aria-label="Close menu overlay"
-          />
-          <div
-            id="dashboard-menu-popup"
-            className={`absolute right-4 top-20 w-[min(100%,20rem)] rounded-3xl border shadow-2xl sm:right-6 sm:top-24 ${popupTone}`}
-          >
-            <div className="flex items-center justify-between px-5 py-4">
-              <span className="text-xs font-semibold uppercase tracking-[0.3em]">Menu</span>
-              <button
-                type="button"
-                onClick={() => setShowMenu(false)}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${controlTone}`}
-                aria-label="Close menu"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="space-y-4 px-5 pb-5">
-              <div className={`rounded-2xl px-4 py-3 ${trayTone}`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowNotifications(true);
-                  }}
-                  className="flex w-full items-center justify-between text-sm font-medium"
+        {/* Colorful Analytics Grid */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {userStats.isLoading ? (
+            // Loading skeleton
+            <>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonStatsCard key={index} className="animate-pulse" />
+              ))}
+            </>
+          ) : (
+            stats.map((stat, index) => {
+              const cardStyles = [
+                'stat-card-blue',
+                'stat-card-purple',
+                'stat-card-emerald',
+                'stat-card-amber'
+              ];
+              return (
+                <div
+                  key={stat.label}
+                  className={`stat-card p-4 md:p-6 ${cardStyles[index % 4]} group animate-fade-in`}
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <span className="flex items-center gap-3">
-                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${badgeTone}`}>
-                      <Bell size={18} />
-                    </span>
-                    Recent alerts
+                  <div className="stat-card-edge" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-90 mb-2 block">
+                    {stat.label}
                   </span>
-                  {unreadCount > 0 && (
-                    <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-2 text-[10px] font-bold text-white">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-              <nav className="space-y-2" aria-label="Dashboard navigation">
-                {menuItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleMenuItemClick(item.id)}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-semibold transition-colors ${
-                      isDarkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className={`grid h-8 w-8 place-items-center rounded-xl ${badgeTone}`}>{item.icon}</span>
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="px-6 py-6">
-        <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 lg:grid-cols-2">
-          {stats.map((stat, index) => {
-            let bgColor = '';
-            let borderClass = isDarkMode ? 'border border-gray-700' : 'border border-gray-200';
-            const labelColorClass = isDarkMode ? 'text-white/75' : 'text-muted';
-            const valueColorClass = isDarkMode ? 'text-white' : 'text-brand-600';
-            const helperColorClass = isDarkMode ? 'text-white/80' : 'text-muted';
-
-            if (isDarkMode) {
-              bgColor =
-                darkStatBackgrounds[index] ??
-                'bg-gradient-to-br from-brand-500/20 via-brand-500/6 to-surface-layer/70 border-transparent ring-1 ring-brand-500/35 shadow-[0_32px_84px_-40px_rgba(79,70,229,0.7)]';
-              borderClass = 'border-transparent';
-            } else {
-              switch (index) {
-                case 0:
-                  bgColor = '!bg-rose-50';
-                  break;
-                case 1:
-                  bgColor = '!bg-green-50';
-                  break;
-                case 2:
-                  bgColor = '!bg-violet-100';
-                  break;
-                case 3:
-                  bgColor = '!bg-amber-50';
-                  break;
-                default:
-                  bgColor = 'bg-gradient-to-br from-white to-primary/5';
-              }
-            }
-
-            return (
-              <Card
-                key={stat.label}
-                className={`p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg rounded-2xl h-32 flex flex-col ${borderClass} ${bgColor}`}
-                style={{ animationDelay: `${index * 80}ms` }}
-              >
-                <p className={`text-xs uppercase tracking-wide truncate ${labelColorClass}`}>{stat.label}</p>
-                <p className={`mt-3 text-2xl font-semibold flex-1 flex items-center ${valueColorClass}`}>{stat.value}</p>
-                <p className={`mt-2 text-xs truncate ${helperColorClass}`}>{stat.helper}</p>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="px-6 py-8 space-y-8">
-        <Card
-          className="cursor-pointer border-none bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 text-emerald-900 transition hover:-translate-y-1 hover:shadow-lg dark:from-emerald-700/30 dark:to-emerald-600/20 dark:text-emerald-200"
-          onClick={handleCommunityMarketplace}
-        >
-          <div className="relative">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-white/60 p-3 text-emerald-600 shadow-inner dark:bg-emerald-900/50 dark:text-emerald-200">
-                <Globe size={20} />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Community roadmaps</h2>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600/20 text-emerald-600 dark:text-emerald-300 dark:bg-emerald-500/20">
-                    <ChevronRight size={16} />
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-display font-bold">
+                      {stat.value}
+                    </p>
                   </div>
+                  <p className="text-[10px] font-bold opacity-80 mt-2">
+                    {stat.helper}
+                  </p>
                 </div>
-                <p className="mt-1 text-sm opacity-80">
-                  Discover playbooks from ambitious builders across the continent. Learn the exact moves that worked.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1 text-xs font-medium">
-                  <span className="rounded-full bg-white/70 px-2 py-1 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
-                    500+ curated paths
-                  </span>
-                  <span className="rounded-full bg-white/70 px-2 py-1 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
-                    Weekly live sessions
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
+              );
+            })
+          )}
+        </section>
 
-        <Card
-          className={`${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} p-5 cursor-pointer transition hover:-translate-y-1 hover:shadow-lg`}
-          onClick={handleCVManagement}
-        >
-          <div className="relative">
-            <div className="flex items-start gap-3">
-              <div
-                className={`rounded-xl p-3 shadow-inner ${
-                  isDarkMode ? 'bg-blue-900/30 text-blue-200' : 'bg-blue-50 text-blue-600'
-                }`}
-              >
-                <Upload size={20} />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">CV workspace</h2>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-300 dark:bg-blue-500/20">
-                    <ChevronRight size={16} />
-                  </div>
-                </div>
-                <p className="mt-1 text-sm text-soft">
-                  Upload, optimise, and version your CV with instant AI quality checks and recruiter tips.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1 text-xs text-muted">
-                  <span className="rounded-full bg-blue-500/10 px-2 py-1 text-blue-600 dark:text-blue-300">
-                    ATS scan
-                  </span>
-                  <span className="rounded-full bg-blue-500/10 px-2 py-1 text-blue-600 dark:text-blue-300">
-                    Tone adjustments
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} p-6 shadow-sm`}>
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Content Layout */}
+        <div className="grid lg:grid-cols-12 gap-8 pb-8">
+          <div className="lg:col-span-8 space-y-10">
+            {/* Featured Opportunities - Swipeable Carousel */}
+            <section className="space-y-4">
               <div className="flex items-center gap-3">
-                <Target size={20} className="text-primary" />
-                <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                  Focus this week
-                </h2>
+                <div className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                  <Sparkles size={22} />
+                </div>
+                <h2 className="heading-md">Featured Opportunities</h2>
               </div>
-              <div className="flex items-center gap-2">
-                {goals.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleViewAllGoalsClick}
-                    className="flex-shrink-0"
-                  >
-                    View all
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  onClick={handleAddGoal}
-                  className="inline-flex items-center gap-2 px-4 py-2 flex-shrink-0"
-                >
-                  <Plus size={14} />
-                  Add goal
-                </Button>
-              </div>
-            </div>
-            <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              {goals.length === 0
-                ? 'Create your first goal to start tracking your momentum.'
-                : hasMoreGoals
-                ? `Showing your top ${focusGoals.length} goals. View all to explore everything you are working on.`
-                : 'Stay close to the goals that compound your growth.'}
-            </p>
-          </div>
-          <div className="space-y-4">
-            {focusGoals.length === 0 ? (
-              <div
-                className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center ${
-                  isDarkMode ? 'border-gray-700 bg-gray-800/70 text-gray-300' : 'border-gray-200 bg-gray-50 text-gray-600'
-                }`}
-              >
-                <Target size={28} className="text-primary" />
-                <h3 className="mt-3 text-base font-semibold">No goals yet</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Add a goal to see it tracked here and across your dashboard.
-                </p>
-                <Button onClick={handleAddGoal} className="mt-4 inline-flex items-center gap-2">
-                  <Plus size={14} />
-                  Add goal
-                </Button>
-              </div>
-            ) : (
-              focusGoals.map((goal, index) => {
-                const progress = Math.min(Math.max(Math.round(goal.progress), 0), 100);
-                const deadlineLabel = formatDateShort(goal.deadline);
-                const dueCopy = describeDueDate(goal.deadline);
-                const isCompleted = goal.status === 'completed';
-                const updatedCopy = formatUpdatedAt(goal.updatedAt);
-                const description =
-                  goal.description && goal.description.length > 110
-                    ? `${goal.description.slice(0, 110)}...`
-                    : goal.description;
-                const trailingCopy = isCompleted
-                  ? 'Completed'
-                  : updatedCopy
-                  ? `Updated ${updatedCopy}`
-                  : null;
-                return (
-                  <button
-                    key={goal.id}
-                    type="button"
-                    onClick={() => onGoalClick(goal.id)}
-                    className={`w-full rounded-2xl border px-4 py-4 text-left transition-all animate-slide-up ${
-                      isDarkMode
-                        ? 'border-gray-700 bg-gray-800 hover:bg-gray-700'
-                        : 'border-gray-200 bg-white hover:bg-gray-50'
-                    }`}
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <h3 className={`text-base font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                            {goal.title}
-                          </h3>
-                          <div className="flex items-center gap-2 text-xs text-muted">
-                            <span>{deadlineLabel}</span>
-                            <ChevronRight size={16} className="text-muted" />
+
+              <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-none snap-x snap-mandatory">
+                {opportunitiesLoading ? (
+                  // Loading skeleton
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="flex-shrink-0 w-[300px] snap-start">
+                      <SkeletonCard className="h-[380px]" />
+                    </div>
+                  ))
+                ) : featuredOpportunities.length === 0 ? (
+                  // Empty state
+                  <div className="w-full py-8">
+                    <EmptyOpportunities onExplore={onViewAllOpportunities} />
+                  </div>
+                ) : (
+                  featuredOpportunities.map((opportunity: any, idx) => (
+                    <div
+                      key={`featured-${idx}`}
+                      onClick={() => onOpportunityClick(opportunity)}
+                      className="flex-shrink-0 w-[300px] snap-start"
+                    >
+                      <div className="premium-card p-0 flex flex-col group cursor-pointer overflow-hidden h-[380px]">
+                        {/* Clean Media Section */}
+                        <div className="h-40 overflow-hidden relative bg-slate-100 dark:bg-slate-800">
+                          {opportunity.image ? (
+                            <img
+                              src={opportunity.image}
+                              alt=""
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Globe size={32} className="text-slate-300" />
+                            </div>
+                          )}
+                          <div className="absolute top-3 left-3 bg-white/90 dark:bg-gray-900/90 px-2 py-1 rounded-lg text-[10px] font-bold text-primary border border-subtle">
+                            FEATURED
                           </div>
                         </div>
-                        {description && (
-                          <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                            {description}
+
+                        {/* Clean Content Section */}
+                        <div className="p-5 flex-1 flex flex-col">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                            {opportunity.organization || 'Verified Partner'}
                           </p>
-                        )}
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-                          <span
-                            className={
-                              isCompleted
-                                ? 'font-medium text-green-600 dark:text-green-400'
-                                : undefined
-                            }
-                          >
-                            {isCompleted ? 'Completed' : dueCopy}
-                          </span>
-                          {goal.priority && (
-                            <span
-                              className={`rounded-full border px-2 py-1 capitalize ${getPriorityBadgeClass(goal.priority)}`}
-                            >
-                              Priority {goal.priority}
-                            </span>
-                          )}
+                          <h3 className="text-lg font-display font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2 mb-4">
+                            {opportunity.title}
+                          </h3>
+
+                          <div className="mt-auto space-y-4">
+                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <Users size={12} />
+                                852 Enrolled
+                              </span>
+                              <span className="text-emerald-500 flex items-center gap-1">
+                                <TrendingUp size={12} />
+                                High Success
+                              </span>
+                            </div>
+
+                            <Button variant="secondary" size="sm" className="w-full rounded-xl py-2.5 h-auto text-xs font-bold border-subtle">
+                              View Plan
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-neutral-200/70 dark:bg-neutral-700/40 backdrop-blur-sm">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-accent-400 shadow-[0_12px_32px_-18px_rgba(6,182,212,0.9)] transition-[width] duration-500 ease-out"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs">
-                      <span className="font-medium text-primary">{progress}% complete</span>
-                      {trailingCopy && (
-                        <span
-                          className={`${
-                            isCompleted ? 'text-green-600 dark:text-green-400' : 'text-muted'
-                          }`}
-                        >
-                          {trailingCopy}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </Card>
+                  ))
+                )}
+              </div>
+            </section>
 
-        <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} p-6`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Target size={20} className="text-brand-600" />
-              <h2 className="text-lg font-semibold">Opportunities for you</h2>
-            </div>
-            <Button variant="secondary" size="sm" onClick={onViewAllOpportunities}>
-              View all
-            </Button>
-          </div>
-            <div className="mt-4 space-y-4">
-              {opportunitiesLoading &&
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={`opp-skeleton-${index}`}
-                    className="rounded-2xl border border-subtle bg-surface-layer p-4 animate-pulse"
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-                        <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
-                        <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-700" />
-                      </div>
-                      <div className="h-4 w-12 rounded bg-gray-200 dark:bg-gray-700" />
-                    </div>
+            {/* Recommended Row */}
+            <section>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Briefcase size={22} />
                   </div>
-                ))}
+                  <h2 className="heading-md">Recommended for You</h2>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onViewAllOpportunities}
+                  className="rounded-xl border-slate-200 dark:border-white/10"
+                >
+                  Explore All
+                </Button>
+              </div>
 
-              {!opportunitiesLoading &&
-                featuredOpportunities.map((opportunity, index) => (
-                  <button
-                    key={opportunity.id}
-                    type="button"
-                    className="w-full rounded-2xl border border-subtle bg-surface-layer p-4 text-left transition hover:border-brand-200 hover:shadow-elevated"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                    onClick={() => onOpportunityClick(opportunity)}
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="space-y-2 flex-1 min-w-0">
-                        <h3 className="text-base font-semibold truncate">{opportunity.title}</h3>
-                        <p className="text-sm text-soft leading-tight">{opportunity.description}</p>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                          <span className="rounded-full bg-brand-600/10 px-3 py-1 text-brand-600">
-                            {opportunity.category}
-                          </span>
-                          {opportunity.deadline && <span>Due {opportunity.deadline}</span>}
-                          <span>{opportunity.location}</span>
-                        </div>
+              <div className="grid gap-3">
+                {opportunitiesLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-20 bg-white/50 dark:bg-white/5 rounded-2xl animate-pulse" />
+                  ))
+                ) : opportunityFeed?.slice(0, 5).map((item: any, idx) => {
+                  const opportunity = 'opportunity' in item ? item.opportunity : item;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => onOpportunityClick(opportunity)}
+                      className="flex items-center gap-4 p-3 rounded-2xl hover:bg-white dark:hover:bg-white/5 border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all cursor-pointer group"
+                    >
+                      <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+                        {opportunity.image ? (
+                          <img src={opportunity.image} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Briefcase size={20} />
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-col items-end justify-center flex-shrink-0">
-                        <div className="text-sm font-semibold text-success">
-                          {Math.round(
-                            (opportunity as any).matchScore ??
-                            (opportunity as any).match ??
-                            0
-                          )}% match
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{opportunity.category || 'Direct'}</span>
+                          <span className="text-slate-300 dark:text-slate-700">•</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{opportunity.organization || 'Global'}</span>
                         </div>
-                        <ChevronRight size={18} className="text-muted flex-shrink-0" />
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors truncate">
+                          {opportunity.title}
+                        </h3>
+                      </div>
+                      <div className="shrink-0">
+                        <ChevronRight className="text-slate-300 group-hover:text-primary transition-colors" size={18} />
                       </div>
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
+              </div>
+            </section>
 
-              {!opportunitiesLoading && featuredOpportunities.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-subtle bg-surface-layer/50 p-6 text-center">
-                  <p className="text-sm text-soft">
-                    {opportunitiesError
-                      ? "We couldn't load personalised opportunities right now."
-                      : 'No personalised opportunities yet. Check back soon.'}
-                  </p>
-                  {opportunitiesError && (
-                    <Button variant="secondary" size="sm" className="mt-3" onClick={refreshOpportunities}>
-                      Try again
-                    </Button>
-                  )}
+            {/* Goals Tracker */}
+            <section>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                    <Target size={22} />
+                  </div>
+                  <h2 className="heading-md">Your Active Goals</h2>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onViewAllGoals}
+                  className="rounded-xl border-slate-200 dark:border-white/10"
+                >
+                  Manage
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                {focusGoals.length > 0 ? (
+                  focusGoals.map((goal) => (
+                    <div
+                      key={goal.id}
+                      onClick={() => onGoalClick(goal.id)}
+                      className="glass-card group cursor-pointer hover:border-primary/30 transition-all p-6"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="flex-1 space-y-4">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors">
+                              <Target size={20} />
+                            </div>
+                            <h4 className="text-lg font-display font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                              {goal.title}
+                            </h4>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                              <span>Completion</span>
+                              <span className="text-primary">{Math.round(goal.progress)}%</span>
+                            </div>
+                            <div className="h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all duration-1000"
+                                style={{ width: `${goal.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 shrink-0">
+                          <div className="text-right hidden md:block border-l border-subtle pl-6">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Priority</p>
+                            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">High Impact</p>
+                          </div>
+                          <div className="h-10 w-10 rounded-full border border-subtle flex items-center justify-center group-hover:border-primary group-hover:bg-primary/5 transition-all">
+                            <ChevronRight className="text-slate-300 group-hover:text-primary transition-colors" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="glass-card p-12 text-center border-dashed">
+                    <p className="text-slate-400 mb-6 font-medium">No active trajectories found. Start your journey today.</p>
+                    <Button onClick={onAddGoal} variant="primary" className="rounded-2xl px-8 py-3.5 h-auto font-bold shadow-soft">Create First Goal</Button>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+
+          <aside className="lg:col-span-4 space-y-6">
+            {/* Recent */}
+            <section className="p-5 relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-6 relative">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                    <Award size={18} />
+                  </div>
+                  <h2 className="text-base font-bold">Recent</h2>
+                </div>
+                <button
+                  onClick={() => onNavigate && onNavigate('achievements')}
+                  className="text-[10px] font-bold text-brand-500 hover:text-brand-600 uppercase tracking-wider"
+                >
+                  View All
+                </button>
+              </div>
+
+              <div className="space-y-4 relative">
+                {recentWins.length > 0 ? (
+                  recentWins.map((win) => (
+                    <div key={win.id} className="flex gap-3 items-center group/win p-2 rounded-xl hover:bg-white/40 dark:hover:bg-white/5 transition-all">
+                      <div className="h-8 w-8 shrink-0 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                        <Sparkles size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold truncate group-hover/win:text-brand-500 transition-colors">
+                          {win.title}
+                        </p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">
+                          {win.date}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 flex flex-col items-center justify-center text-center px-4 grayscale opacity-40">
+                    <TrendingUp size={32} className="mb-2 text-slate-400" />
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-tight">Your wins show up here</p>
+                  </div>
+                )}
+              </div>
+
+              {recentWins.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/5">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <span>Consistency</span>
+                    <span className="text-emerald-500">85%</span>
+                  </div>
+                  <div className="mt-2 h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 w-[85%] rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                  </div>
                 </div>
               )}
-            </div>
-        </Card>
+            </section>
+          </aside>
+        </div>
+      </main>
 
-        <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} p-6`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <TrendingUp size={20} className="text-accent-500" />
-              <h2 className="text-lg font-semibold">Recent wins</h2>
-            </div>
-            <Button variant="secondary" size="sm" onClick={handleViewMoreAchievements}>
-              View more
-            </Button>
-          </div>
-          <div className="mt-3 space-y-1">
-            {recentWins.map((achievement, index) => (
-              <div
-                key={achievement.id}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-gray-100 dark:hover:bg-gray-700/60"
-                style={{ animationDelay: `${index * 40}ms` }}
-              >
-                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent-500/10 text-accent-500 opacity-70">
-                  {achievement.icon}
-                </div>
-                <div className="flex flex-1 items-baseline justify-between">
-                  <p className="text-xs font-medium text-soft opacity-80">{achievement.title}</p>
-                  <span className="text-[0.65rem] text-muted opacity-70">{achievement.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <NotificationInbox isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
+      <NotificationInbox
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </div>
   );
-};
+});
 
 export default Dashboard;
-
-
-

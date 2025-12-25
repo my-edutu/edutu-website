@@ -2,6 +2,18 @@ import { supabase } from './supabaseClient';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import type { AppUser } from '../types/user';
 import type { OnboardingState } from '../types/onboarding';
+import { Capacitor } from '@capacitor/core';
+
+// Get the appropriate redirect URL based on platform
+const getRedirectUrl = (path: string = '') => {
+  // Check if running in Capacitor (native app)
+  if (Capacitor.isNativePlatform()) {
+    // Use deep link scheme for mobile
+    return `ai.edutu.app://auth${path}`;
+  }
+  // Use web URL for browser
+  return `${window.location.origin}${path}`;
+};
 
 export interface ProfilePreferences {
   onboarding?: OnboardingState;
@@ -25,10 +37,12 @@ export interface Profile {
 
 export const authService = {
   async signInWithGoogle(redirectTo?: string) {
+    const redirectUrl = redirectTo ?? getRedirectUrl('/callback');
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo ?? window.location.origin,
+        redirectTo: redirectUrl,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -38,6 +52,62 @@ export const authService = {
 
     if (error) throw error;
     return data;
+  },
+
+  // This function helps track that the user came from a signup flow
+  async signInWithGoogleForNewUser(redirectTo?: string) {
+    // Add a parameter to indicate this is a signup flow
+    const baseRedirect = redirectTo ?? getRedirectUrl('/callback');
+    const signupRedirectUrl = `${baseRedirect}${baseRedirect.includes('?') ? '&' : '?'}signup=true`;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: signupRedirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Handle OAuth callback from deep link
+   * Call this when your app receives a deep link URL
+   */
+  async handleOAuthCallback(url: string) {
+    // Extract the auth tokens from the URL
+    // Supabase uses hash fragments for OAuth tokens
+    const hashParams = new URLSearchParams(url.split('#')[1] || '');
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+
+      if (error) throw error;
+      return data;
+    }
+
+    // If no tokens in hash, try query params (some OAuth flows)
+    const queryParams = new URLSearchParams(url.split('?')[1] || '');
+    const code = queryParams.get('code');
+
+    if (code) {
+      // Exchange code for session
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+      return data;
+    }
+
+    return null;
   },
 
   async signOut() {
@@ -57,7 +127,7 @@ export const authService = {
     return user;
   },
 
-  async updateUserProfile(updates: { name?: string; full_name?: string; age?: number; [key: string]: unknown }) {
+  async updateUserProfile(updates: { name?: string; full_name?: string; age?: number;[key: string]: unknown }) {
     const { data, error } = await supabase.auth.updateUser({
       data: updates,
     });

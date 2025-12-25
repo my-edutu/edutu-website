@@ -9,7 +9,12 @@ import {
   RefreshCcw,
   Search,
   Target,
-  Plus
+  Plus,
+  Zap,
+  Flame,
+  Award,
+  TrendingUp,
+  ShieldAlert
 } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
@@ -23,9 +28,9 @@ interface AllGoalsProps {
 }
 
 const statusFilters = [
-  { id: 'all', label: 'All goals' },
+  { id: 'all', label: 'All Quests' },
   { id: 'active', label: 'Active' },
-  { id: 'completed', label: 'Completed' },
+  { id: 'completed', label: 'Mastered' },
   { id: 'archived', label: 'Archived' }
 ] as const;
 
@@ -38,13 +43,9 @@ const AllGoals: React.FC<AllGoalsProps> = ({ onBack, onSelectGoal, onAddGoal }) 
   const [searchTerm, setSearchTerm] = useState('');
 
   const formatDateShort = (date?: string | null) => {
-    if (!date) {
-      return 'No deadline';
-    }
+    if (!date) return 'No deadline';
     const parsed = new Date(date);
-    if (Number.isNaN(parsed.getTime())) {
-      return 'No deadline';
-    }
+    if (Number.isNaN(parsed.getTime())) return 'No deadline';
     return parsed.toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
@@ -52,180 +53,40 @@ const AllGoals: React.FC<AllGoalsProps> = ({ onBack, onSelectGoal, onAddGoal }) 
     });
   };
 
-  const describeDueDate = (deadline?: string) => {
-    if (!deadline) {
-      return 'No deadline';
-    }
-    const parsed = new Date(deadline);
-    if (Number.isNaN(parsed.getTime())) {
-      return 'No deadline';
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diffDays = Math.round((parsed.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays > 1) {
-      return `Due in ${diffDays} days`;
-    }
-    if (diffDays === 1) {
-      return 'Due tomorrow';
-    }
-    if (diffDays === 0) {
-      return 'Due today';
-    }
-    if (diffDays === -1) {
-      return 'Overdue by 1 day';
-    }
-    return `Overdue by ${Math.abs(diffDays)} days`;
-  };
-
-  const getPriorityBadgeClass = (priority?: Goal['priority']) => {
-    switch (priority) {
-      case 'high':
-        return 'border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300';
-      case 'medium':
-        return 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
-      case 'low':
-        return 'border-green-200 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300';
-      default:
-        return 'border-gray-200 bg-gray-100 text-gray-600 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300';
-    }
-  };
-
-  const getStatusBadgeClass = (status: Goal['status']) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
-      case 'archived':
-        return 'bg-gray-200 text-gray-600 dark:bg-gray-700/60 dark:text-gray-300';
-      default:
-        return 'bg-primary/10 text-primary';
-    }
-  };
-
   const formatUpdatedAt = (updatedAt: string) => {
     const parsed = new Date(updatedAt);
-    if (Number.isNaN(parsed.getTime())) {
-      return 'just now';
-    }
+    if (Number.isNaN(parsed.getTime())) return 'just now';
     const diffMs = Date.now() - parsed.getTime();
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    if (diffMinutes < 1) {
-      return 'just now';
-    }
-    if (diffMinutes < 60) {
-      return `${diffMinutes}m ago`;
-    }
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    }
+    if (diffHours < 24) return `${diffHours}h ago`;
     const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) {
-      return `${diffDays}d ago`;
-    }
+    if (diffDays < 7) return `${diffDays}d ago`;
     return parsed.toLocaleDateString();
   };
 
   const activeGoals = useMemo(() => goals.filter((goal) => goal.status === 'active'), [goals]);
   const completedGoals = useMemo(() => goals.filter((goal) => goal.status === 'completed'), [goals]);
-  const archivedGoals = useMemo(() => goals.filter((goal) => goal.status === 'archived'), [goals]);
-
-  const recentActivityCount = useMemo(() => {
-    const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
-    return goals.filter((goal) => new Date(goal.updatedAt).getTime() >= cutoff).length;
-  }, [goals]);
-
-  const consistencyScore = goals.length
-    ? Math.min(100, Math.round((recentActivityCount / goals.length) * 100))
-    : 0;
 
   const averageProgress = activeGoals.length
-    ? Math.round(
-        activeGoals.reduce((total, goal) => total + goal.progress, 0) /
-          activeGoals.length
-      )
+    ? Math.round(activeGoals.reduce((total, goal) => total + goal.progress, 0) / activeGoals.length)
     : 0;
-
-  const completionRate = goals.length
-    ? Math.round((completedGoals.length / goals.length) * 100)
-    : 0;
-
-  const upcomingGoal = useMemo(() => {
-    const withDeadline = activeGoals.filter((goal) => goal.deadline);
-    return withDeadline
-      .sort(
-        (a, b) =>
-          new Date(a.deadline as string).getTime() -
-          new Date(b.deadline as string).getTime()
-      )[0] ?? null;
-  }, [activeGoals]);
-
-  const summaryCards = useMemo(
-    () => [
-      {
-        label: 'Total goals',
-        value: goals.length.toString(),
-        helper: `${activeGoals.length} active · ${completedGoals.length} completed`
-      },
-      {
-        label: 'Consistency',
-        value: `${consistencyScore}%`,
-        helper:
-          consistencyScore >= 70
-            ? 'Momentum looks strong'
-            : 'Aim for 70% consistency this week'
-      },
-      {
-        label: 'Avg progress',
-        value: `${averageProgress}%`,
-        helper: activeGoals.length ? 'Across active goals' : 'Add a goal to start tracking'
-      },
-      {
-        label: 'Next deadline',
-        value: upcomingGoal ? formatDateShort(upcomingGoal.deadline) : 'No deadline',
-        helper: upcomingGoal
-          ? `${describeDueDate(upcomingGoal.deadline)} · ${upcomingGoal.title}`
-          : 'Set target dates to stay accountable'
-      }
-    ],
-    [
-      goals.length,
-      activeGoals.length,
-      completedGoals.length,
-      consistencyScore,
-      averageProgress,
-      upcomingGoal?.deadline,
-      upcomingGoal?.title
-    ]
-  );
 
   const filteredGoals = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-
     return goals
       .filter((goal) => (statusFilter === 'all' ? true : goal.status === statusFilter))
       .filter((goal) => {
-        if (!query) {
-          return true;
-        }
+        if (!query) return true;
         return (
           goal.title.toLowerCase().includes(query) ||
           (goal.description?.toLowerCase().includes(query) ?? false) ||
           (goal.category?.toLowerCase().includes(query) ?? false)
         );
       })
-      .sort((a, b) => {
-        const statusWeight = (status: Goal['status']) => {
-          if (status === 'active') return 0;
-          if (status === 'completed') return 1;
-          return 2;
-        };
-        const statusDiff = statusWeight(a.status) - statusWeight(b.status);
-        if (statusDiff !== 0) {
-          return statusDiff;
-        }
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      });
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   }, [goals, statusFilter, searchTerm]);
 
   const handleMarkCompleted = (goalId: string) => {
@@ -236,7 +97,7 @@ const AllGoals: React.FC<AllGoalsProps> = ({ onBack, onSelectGoal, onAddGoal }) 
     updateGoal(goal.id, {
       status: 'active',
       progress: Math.min(goal.progress, 95),
-      completedAt: null
+      completed_at: null
     });
   };
 
@@ -248,133 +109,89 @@ const AllGoals: React.FC<AllGoalsProps> = ({ onBack, onSelectGoal, onAddGoal }) 
     updateGoal(goal.id, { status: 'active' });
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBack = () => {
-    scrollToTop();
-    onBack();
-  };
-
-  const handleAddGoal = () => {
-    scrollToTop();
-    onAddGoal();
-  };
-
   return (
-    <div className={`min-h-screen bg-white dark:bg-gray-900 animate-fade-in ${isDarkMode ? 'dark' : ''}`}>
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="p-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              onClick={handleBack}
-              className="p-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-950 text-white' : 'bg-slate-50 text-slate-800'} font-body transition-colors duration-500 pb-24`}>
+      <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-10 mesh-gradient" />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 space-y-12 relative z-10">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 animate-slide-up">
+          <div className="space-y-4">
+            <button
+              onClick={onBack}
+              className="group flex items-center gap-2 text-xs font-black text-brand-500 uppercase tracking-[0.2em] mb-2 hover:gap-3 transition-all"
             >
-              <ArrowLeft size={20} />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">All Goals</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {goals.length} total · {activeGoals.length} active · {completedGoals.length} completed ·{' '}
-                {archivedGoals.length} archived · {completionRate}% completion rate
-              </p>
+              <ArrowLeft size={14} />
+              Return Center
+            </button>
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 shadow-xl shadow-brand-500/10">
+                <Target size={32} />
+              </div>
+              <div>
+                <h1 className="text-4xl md:text-5xl font-display font-black tracking-tight leading-none italic">MISSION BOARD</h1>
+                <p className="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-[0.3em] mt-2">
+                  {goals.length} active trajectories detected
+                </p>
+              </div>
             </div>
-            <Button onClick={handleAddGoal} className="inline-flex items-center gap-2">
-              <Plus size={16} />
-              Add goal
-            </Button>
           </div>
-        </div>
-      </div>
 
-      <div className="p-4 space-y-6">
-        <div className="space-y-3">
-          <div className="grid grid-cols-4 gap-4 overflow-x-auto">
-            {summaryCards.map((card, index) => {
-              let bgColor = '';
-              if (isDarkMode) {
-                switch(index) {
-                  case 0: // Total goals
-                    bgColor = 'bg-blue-900/20';
-                    break;
-                  case 1: // Consistency
-                    bgColor = 'bg-green-900/20';
-                    break;
-                  case 2: // Avg progress
-                    bgColor = 'bg-purple-900/20';
-                    break;
-                  case 3: // Next deadline
-                    bgColor = 'bg-amber-900/20';
-                    break;
-                  default:
-                    bgColor = 'bg-gray-800/70';
-                }
-              } else {
-                switch(index) {
-                  case 0: // Total goals
-                    bgColor = 'bg-blue-50';
-                    break;
-                  case 1: // Consistency
-                    bgColor = 'bg-green-50';
-                    break;
-                  case 2: // Avg progress
-                    bgColor = 'bg-purple-50';
-                    break;
-                  case 3: // Next deadline
-                    bgColor = 'bg-amber-50';
-                    break;
-                  default:
-                    bgColor = 'bg-white';
-                }
-              }
-              
-              return (
-              <Card
-                key={card.label}
-                className={`flex-shrink-0 w-32 ${bgColor} ${isDarkMode ? 'border border-gray-700' : 'border border-gray-200'} p-4 rounded-2xl`}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <p className="text-xs uppercase tracking-wide text-muted">{card.label}</p>
-                <p className="mt-2 text-2xl font-semibold text-primary">{card.value}</p>
-                <p className="mt-1 text-xs text-muted">{card.helper}</p>
-              </Card>
-            )})}
-          </div>
+          <Button
+            variant="primary"
+            onClick={onAddGoal}
+            className="rounded-2xl px-6 py-4 h-auto font-black uppercase text-xs tracking-widest shadow-xl shadow-brand-500/20"
+          >
+            <Plus size={18} className="mr-2" />
+            INITIATE NEW QUEST
+          </Button>
         </div>
 
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative lg:max-w-sm w-full">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            />
+        {/* Intelligence Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          {[
+            { label: 'Avg Progress', value: `${averageProgress}%`, icon: Zap, color: 'brand' },
+            { label: 'Active Quests', value: activeGoals.length, icon: Target, color: 'indigo' },
+            { label: 'Mastered', value: completedGoals.length, icon: Award, color: 'emerald' },
+            { label: 'Exp. Streak', value: '12 Days', icon: Flame, color: 'rose' }
+          ].map((stat, i) => (
+            <div key={i} className="premium-card p-5 border-none bg-white dark:bg-gray-900 shadow-xl shadow-slate-200/40 dark:shadow-none hover:translate-y-[-4px] transition-transform duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-primary/10 text-brand-500">
+                  <stat.icon size={20} />
+                </div>
+                <div className="h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{stat.label}</p>
+                <h4 className="text-2xl font-display font-black italic leading-none">{stat.value}</h4>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Global Control Bar */}
+        <div className="flex flex-col md:flex-row gap-4 sticky top-6 z-40 animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <div className="flex-1 relative group">
+            <Search size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
             <input
               type="text"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search goals by title, description, or category..."
-              className={`w-full rounded-2xl border px-10 py-3 text-sm transition focus:ring-2 focus:ring-primary focus:border-transparent ${
-                isDarkMode
-                  ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500'
-                  : 'border-gray-200 bg-white text-gray-800 placeholder-gray-400'
-              }`}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="LOCATE SPECIFIC OBJECTIVE..."
+              className="w-full pl-14 pr-6 py-4 rounded-[1.5rem] border-none bg-white dark:bg-gray-900 shadow-xl shadow-slate-200/40 dark:shadow-none text-slate-900 dark:text-white placeholder-slate-500 focus:ring-2 focus:ring-brand-500 transition-all font-black text-xs uppercase tracking-widest"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {statusFilters.map((filter) => (
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+            {statusFilters.map(filter => (
               <button
                 key={filter.id}
-                type="button"
                 onClick={() => setStatusFilter(filter.id)}
-                className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
-                  statusFilter === filter.id
-                    ? 'bg-primary text-white shadow-sm'
-                    : isDarkMode
-                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all whitespace-nowrap shadow-xl ${statusFilter === filter.id
+                  ? 'bg-gray-900 text-white shadow-brand-500/20 dark:bg-brand-500'
+                  : 'bg-white dark:bg-gray-900 text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-slate-200/50 dark:shadow-none'
+                  }`}
               >
                 {filter.label}
               </button>
@@ -382,161 +199,120 @@ const AllGoals: React.FC<AllGoalsProps> = ({ onBack, onSelectGoal, onAddGoal }) 
           </div>
         </div>
 
-        <div className="space-y-4">
-          {filteredGoals.length === 0 ? (
-            <Card
-              className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center ${
-                isDarkMode ? 'border-gray-700 bg-gray-800 text-gray-300' : 'border-gray-200 bg-gray-50 text-gray-600'
-              }`}
-            >
-              <Target size={32} className="text-primary" />
-              <h3 className="text-lg font-semibold">No goals match your filters</h3>
-              <p className="text-sm">
-                Try adjusting the filters or add a new goal to keep your momentum rolling.
-              </p>
-              {statusFilter !== 'all' || searchTerm.trim() ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setStatusFilter('all');
-                    setSearchTerm('');
-                  }}
-                >
-                  Reset filters
-                </Button>
-              ) : (
-                <Button onClick={handleAddGoal} className="inline-flex items-center gap-2">
-                  <Plus size={16} />
-                  Add goal
-                </Button>
-              )}
-            </Card>
-          ) : (
-            filteredGoals.map((goal) => {
-              const progress = Math.min(Math.max(goal.progress, 0), 100);
-              return (
-                <Card
+        {/* Quests Display */}
+        <div className="space-y-6">
+          {filteredGoals.length > 0 ? (
+            <div className="grid md:grid-cols-2 gap-6 pb-12">
+              {filteredGoals.map((goal, index) => (
+                <div
                   key={goal.id}
-                  className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} p-5`}
+                  onClick={() => onSelectGoal(goal.id)}
+                  className="group premium-card p-0 flex flex-col cursor-pointer overflow-hidden border-none bg-white dark:bg-gray-900 shadow-xl shadow-slate-200/40 dark:shadow-none hover:scale-[1.02] transition-all duration-500 animate-slide-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                          {goal.title}
-                        </h3>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${getStatusBadgeClass(
-                            goal.status
-                          )}`}
-                        >
-                          {goal.status}
-                        </span>
+                  <div className="p-6 pb-2">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${goal.priority === 'high' ? 'bg-rose-500/10 text-rose-500' :
+                        goal.priority === 'medium' ? 'bg-amber-500/10 text-amber-500' :
+                          'bg-emerald-500/10 text-emerald-500'
+                        }`}>
+                        {(goal.priority || 'medium').toUpperCase()} Priority
                       </div>
-                      {goal.description && (
-                        <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          {goal.description}
-                        </p>
-                      )}
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar size={14} />
-                          <span>{goal.deadline ? formatDateShort(goal.deadline) : 'No deadline'}</span>
-                          <span className="opacity-70">· {describeDueDate(goal.deadline)}</span>
-                        </span>
-                        {goal.priority && (
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 capitalize ${getPriorityBadgeClass(
-                              goal.priority
-                            )}`}
-                          >
-                            Priority {goal.priority}
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1">
-                          <Clock size={14} />
-                          <span>Updated {formatUpdatedAt(goal.updatedAt)}</span>
-                        </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full bg-brand-500 animate-pulse" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{goal.category || 'General'}</span>
                       </div>
                     </div>
-                    <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Target size={22} />
+
+                    <h3 className="text-2xl font-display font-black italic uppercase leading-tight group-hover:text-brand-500 transition-colors">
+                      {goal.title}
+                    </h3>
+                  </div>
+
+                  <div className="p-6 pt-2 flex-1 flex flex-col">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 line-clamp-2 mb-6 leading-relaxed italic">
+                      {goal.description || "The path forward is clear. Execute each step with precision to achieve maximum efficiency."}
+                    </p>
+
+                    <div className="mt-auto space-y-4">
+                      <div className="flex items-center justify-between font-black text-[10px] uppercase tracking-widest">
+                        <span className="text-slate-400">Progression Matrix</span>
+                        <span className="text-brand-500">{Math.round(goal.progress)}% Verified</span>
+                      </div>
+
+                      <div className="h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden relative">
+                        <div
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-600 via-accent-500 to-indigo-500 rounded-full transition-all duration-1000 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.6)]"
+                          style={{ width: `${goal.progress}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-6 pt-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={12} className="text-brand-500" />
+                          {formatDateShort(goal.deadline)}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock size={12} className="text-brand-500" />
+                          {formatUpdatedAt(goal.updated_at)}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-neutral-200/70 dark:bg-neutral-700/40 backdrop-blur-sm">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-accent-400 shadow-[0_12px_32px_-18px_rgba(6,182,212,0.9)] transition-[width] duration-500 ease-out"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted">
-                    <span>{progress}% complete</span>
-                    {goal.completedAt && goal.status === 'completed' && (
-                      <span>Completed {formatDateShort(goal.completedAt)}</span>
-                    )}
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => onSelectGoal(goal.id)}
-                      className="inline-flex items-center gap-2"
-                    >
-                      <ArrowUpRight size={14} />
-                      View roadmap
-                    </Button>
-                    {goal.status !== 'completed' && goal.status !== 'archived' && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleMarkCompleted(goal.id)}
-                        className="inline-flex items-center gap-2"
+
+                  <div className="grid grid-cols-2 border-t border-slate-100 dark:border-white/5 h-16 transform translate-y-full group-hover:translate-y-0 transition-transform duration-500">
+                    {goal.status !== 'completed' && goal.status !== 'archived' ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMarkCompleted(goal.id); }}
+                        className="flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest bg-brand-500 text-white hover:bg-brand-600 transition-colors"
                       >
                         <CheckCircle2 size={14} />
-                        Mark complete
-                      </Button>
-                    )}
-                    {goal.status === 'completed' && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleReopen(goal)}
-                        className="inline-flex items-center gap-2"
+                        Complete
+                      </button>
+                    ) : goal.status === 'completed' ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleReopen(goal); }}
+                        className="flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest bg-brand-500 text-white hover:bg-brand-600 transition-colors"
                       >
                         <RefreshCcw size={14} />
                         Reopen
-                      </Button>
-                    )}
+                      </button>
+                    ) : <div />}
+
                     {goal.status !== 'archived' ? (
                       <button
-                        type="button"
-                        onClick={() => handleArchive(goal)}
-                        className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-medium transition ${
-                          isDarkMode
-                            ? 'border-gray-700 text-gray-300 hover:bg-gray-700'
-                            : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                        }`}
+                        onClick={(e) => { e.stopPropagation(); handleArchive(goal); }}
+                        className="flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-rose-500 hover:text-white transition-all"
                       >
-                        <Archive size={14} />
+                        <ShieldAlert size={14} />
                         Archive
                       </button>
                     ) : (
                       <button
-                        type="button"
-                        onClick={() => handleActivate(goal)}
-                        className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-medium transition ${
-                          isDarkMode
-                            ? 'border-gray-700 text-gray-300 hover:bg-gray-700'
-                            : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                        }`}
+                        onClick={(e) => { e.stopPropagation(); handleActivate(goal); }}
+                        className="flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-emerald-500 hover:text-white transition-all"
                       >
                         <RefreshCcw size={14} />
                         Restore
                       </button>
                     )}
                   </div>
-                </Card>
-              );
-            })
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-32 premium-card bg-transparent border-dashed border-2 flex flex-col items-center justify-center space-y-6">
+              <div className="h-24 w-24 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center opacity-40">
+                <Target size={48} className="text-slate-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-display font-black italic uppercase">NO MISSIONS DETECTED</h3>
+                <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Acknowledge: The vanguard waits for your command.</p>
+              </div>
+              <Button onClick={onAddGoal} variant="primary" className="rounded-2xl px-8 uppercase italic font-black">
+                INITIATE MISSION
+              </Button>
+            </div>
           )}
         </div>
       </div>

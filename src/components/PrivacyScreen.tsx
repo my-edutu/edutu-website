@@ -1,28 +1,16 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Shield, Eye, EyeOff, Lock, Globe, Users, Database, Trash2, CheckCircle2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Shield, Eye, Lock, Globe, Users, Database, Trash2, CheckCircle2, X } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { useDarkMode } from '../hooks/useDarkMode';
-import { usePersistentState } from '../hooks/usePersistentState';
+import userSettingsService, {
+  type PrivacySettings,
+  type SecuritySettings,
+} from '../services/userSettings';
 
 interface PrivacyScreenProps {
   onBack: () => void;
 }
-
-type PrivacySettings = {
-  profileVisibility: 'public' | 'friends' | 'private';
-  dataSharing: boolean;
-  analyticsTracking: boolean;
-  personalizedAds: boolean;
-  activityStatus: boolean;
-  searchVisibility: boolean;
-};
-
-type SecuritySettings = {
-  twoFactorEnabled: boolean;
-  lastPasswordUpdate: string | null;
-  lastDataDownload: string | null;
-};
 
 const PRIVACY_DEFAULTS: PrivacySettings = {
   profileVisibility: 'public',
@@ -43,32 +31,75 @@ type ActiveModal = 'password' | 'twoFactor' | 'delete' | null;
 
 const PrivacyScreen: React.FC<PrivacyScreenProps> = ({ onBack }) => {
   const { isDarkMode } = useDarkMode();
-  const [privacySettings, setPrivacySettings] = usePersistentState<PrivacySettings>('settings.privacy', PRIVACY_DEFAULTS);
-  const [securitySettings, setSecuritySettings] = usePersistentState<SecuritySettings>('settings.security', SECURITY_DEFAULTS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>(PRIVACY_DEFAULTS);
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>(SECURITY_DEFAULTS);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  // Load settings from Supabase on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await userSettingsService.getUserSettings();
+        if (settings) {
+          setPrivacySettings(settings.privacy);
+          setSecuritySettings(settings.security);
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const showMessage = (message: string) => {
     setActionMessage(message);
     setTimeout(() => setActionMessage(null), 3000);
   };
 
-  const handleToggle = (key: keyof PrivacySettings) => {
+  const handleToggle = async (key: keyof PrivacySettings) => {
+    const newValue = !privacySettings[key];
     setPrivacySettings((prev) => ({
       ...prev,
-      [key]: !prev[key]
+      [key]: newValue
     }));
-    showMessage('Privacy settings updated.');
+
+    setIsSaving(true);
+    const result = await userSettingsService.savePrivacySettings({ [key]: newValue });
+    setIsSaving(false);
+
+    if (result.success) {
+      showMessage('Privacy settings updated.');
+    } else {
+      // Revert on failure
+      setPrivacySettings((prev) => ({ ...prev, [key]: !newValue }));
+      showMessage(result.error || 'Failed to save settings.');
+    }
   };
 
-  const handleVisibilityChange = (value: PrivacySettings['profileVisibility']) => {
+  const handleVisibilityChange = async (value: PrivacySettings['profileVisibility']) => {
+    const previousValue = privacySettings.profileVisibility;
     setPrivacySettings((prev) => ({
       ...prev,
       profileVisibility: value
     }));
-    showMessage(`Profile visibility set to ${value}.`);
+
+    setIsSaving(true);
+    const result = await userSettingsService.savePrivacySettings({ profileVisibility: value });
+    setIsSaving(false);
+
+    if (result.success) {
+      showMessage(`Profile visibility set to ${value}.`);
+    } else {
+      setPrivacySettings((prev) => ({ ...prev, profileVisibility: previousValue }));
+      showMessage(result.error || 'Failed to save settings.');
+    }
   };
 
   const scrollToTop = () => {
@@ -80,34 +111,33 @@ const PrivacyScreen: React.FC<PrivacyScreenProps> = ({ onBack }) => {
     onBack();
   };
 
-  const handleDownloadData = () => {
-    const exportPayload = {
-      exportedAt: new Date().toISOString(),
-      privacySettings,
-      security: {
-        twoFactorEnabled: securitySettings.twoFactorEnabled,
-        lastPasswordUpdate: securitySettings.lastPasswordUpdate
-      }
-    };
+  const handleDownloadData = async () => {
+    setIsSaving(true);
+    const result = await userSettingsService.exportUserData();
+    setIsSaving(false);
 
-    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'edutu-data-export.json';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    if (result.success && result.data) {
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'edutu-data-export.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
 
-    setSecuritySettings((prev) => ({
-      ...prev,
-      lastDataDownload: new Date().toISOString()
-    }));
-    showMessage('A copy of your data has been downloaded.');
+      setSecuritySettings((prev) => ({
+        ...prev,
+        lastDataDownload: new Date().toISOString()
+      }));
+      showMessage('A copy of your data has been downloaded.');
+    } else {
+      showMessage(result.error || 'Failed to export data.');
+    }
   };
 
-  const handlePasswordSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePasswordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!passwordForm.next || passwordForm.next.length < 8) {
@@ -120,37 +150,61 @@ const PrivacyScreen: React.FC<PrivacyScreenProps> = ({ onBack }) => {
       return;
     }
 
-    setSecuritySettings((prev) => ({
-      ...prev,
-      lastPasswordUpdate: new Date().toISOString()
-    }));
-    setPasswordForm({ current: '', next: '', confirm: '' });
-    setActiveModal(null);
-    showMessage('Password updated successfully.');
+    setIsSaving(true);
+    const result = await userSettingsService.changePassword(passwordForm.current, passwordForm.next);
+    setIsSaving(false);
+
+    if (result.success) {
+      setSecuritySettings((prev) => ({
+        ...prev,
+        lastPasswordUpdate: new Date().toISOString()
+      }));
+      setPasswordForm({ current: '', next: '', confirm: '' });
+      setActiveModal(null);
+      showMessage('Password updated successfully.');
+    } else {
+      showMessage(result.error || 'Failed to update password.');
+    }
   };
 
-  const handleTwoFactorToggle = () => {
-    setSecuritySettings((prev) => ({
-      ...prev,
-      twoFactorEnabled: !prev.twoFactorEnabled
-    }));
-    showMessage(
-      securitySettings.twoFactorEnabled
-        ? 'Two-factor authentication disabled.'
-        : 'Two-factor authentication enabled.'
-    );
-    setActiveModal(null);
+  const handleTwoFactorToggle = async () => {
+    const newValue = !securitySettings.twoFactorEnabled;
+
+    setIsSaving(true);
+    const result = await userSettingsService.toggleTwoFactor(newValue);
+    setIsSaving(false);
+
+    if (result.success) {
+      setSecuritySettings((prev) => ({
+        ...prev,
+        twoFactorEnabled: newValue
+      }));
+      showMessage(
+        newValue
+          ? 'Two-factor authentication enabled.'
+          : 'Two-factor authentication disabled.'
+      );
+      setActiveModal(null);
+    } else {
+      showMessage(result.error || 'Failed to update 2FA settings.');
+    }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (deleteConfirmation !== 'DELETE') {
       showMessage('Please type DELETE to confirm.');
       return;
     }
 
-    setDeleteConfirmation('');
-    setActiveModal(null);
-    showMessage('Account deletion request submitted. We will contact you shortly.');
+    setIsSaving(true);
+    const result = await userSettingsService.requestAccountDeletion();
+    setIsSaving(false);
+
+    if (result.success) {
+      setDeleteConfirmation('');
+      setActiveModal(null);
+      showMessage('Account deletion request submitted. We will contact you shortly.');
+    }
   };
 
   const privacyOptions = useMemo(
@@ -323,6 +377,17 @@ const PrivacyScreen: React.FC<PrivacyScreenProps> = ({ onBack }) => {
     );
   };
 
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center ${isDarkMode ? 'dark' : ''}`}>
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">Loading your privacy settings...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-white dark:bg-gray-900 animate-fade-in ${isDarkMode ? 'dark' : ''}`}>
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
@@ -337,9 +402,11 @@ const PrivacyScreen: React.FC<PrivacyScreenProps> = ({ onBack }) => {
             </Button>
             <div className="flex-1">
               <h1 className="text-xl font-bold text-gray-800 dark:text-white">Privacy &amp; Security</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Control your privacy settings</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {isSaving ? 'Saving...' : 'Control your privacy settings'}
+              </p>
             </div>
-            <Shield size={24} className="text-primary" />
+            <Shield size={24} className={`text-primary ${isSaving ? 'animate-pulse' : ''}`} />
           </div>
           {actionMessage && (
             <p className="mt-3 text-sm text-primary flex items-center gap-2">
@@ -403,16 +470,14 @@ const PrivacyScreen: React.FC<PrivacyScreenProps> = ({ onBack }) => {
                 </div>
                 <button
                   onClick={() => handleToggle(setting.id as keyof PrivacySettings)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    setting.enabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-600'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${setting.enabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-600'
+                    }`}
                   aria-pressed={setting.enabled}
                   aria-label={`Toggle ${setting.title}`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      setting.enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${setting.enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
               </div>

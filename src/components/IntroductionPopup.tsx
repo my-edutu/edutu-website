@@ -129,13 +129,13 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
 
   const handleFieldChange =
     (field: keyof IntroductionFormData) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { value } = event.target;
-      setFormData((previous) => ({
-        ...previous,
-        [field]: value
-      }));
-    };
+      (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { value } = event.target;
+        setFormData((previous) => ({
+          ...previous,
+          [field]: value
+        }));
+      };
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -200,140 +200,134 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
     const step = steps[currentStep];
 
     switch (step.content) {
-        case 'welcome':
-          return (
-            <div className="text-center py-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-subtle">
-                <Sparkles size={40} className="text-white" />
+      case 'welcome':
+        return (
+          <div className="text-center py-4 sm:py-6">
+            <div className="relative inline-block mb-8">
+              <div className="absolute inset-0 bg-brand-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
+              <div className="relative w-24 h-24 bg-gradient-to-tr from-brand-600 to-accent-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-brand-500/20 rotate-3 transition-transform hover:rotate-0">
+                <Sparkles size={48} className="text-white" />
+              </div>
+              <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-2 rounded-xl shadow-lg animate-bounce-subtle">
+                <Target size={16} />
+              </div>
             </div>
-            <p className="text-lg text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-              I'm here to help you discover amazing opportunities and create personalized roadmaps to achieve your goals. 
-              Let's get to know each other better so I can provide the best guidance for your journey!
+            <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-3">
+              Ready for your next breakthrough?
+            </h3>
+            <p className="text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
+              I'm Edutu, your personal growth catalyst. Together, we'll map out your future using data-driven insights and AI coaching.
             </p>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <Target size={16} className="text-primary" />
-                <span>Personalized recommendations</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <BookOpen size={16} className="text-accent" />
-                <span>Custom learning paths</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <Briefcase size={16} className="text-green-600" />
-                <span>Career opportunities</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <Heart size={16} className="text-red-500" />
-                <span>Ongoing support</span>
-              </div>
-              </div>
-            </div>
-          );
+          </div>
+        );
 
-        case 'basics':
-          return (
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Full name
+      case 'basics':
+        return (
+          <div className="grid gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">
+                Full name
+              </label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={handleFieldChange('fullName')}
+                placeholder="Enter your name"
+                className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-medium text-slate-900 dark:text-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">
+                  Age
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  max="80"
+                  value={formData.age}
+                  onChange={handleFieldChange('age')}
+                  placeholder="Yrs"
+                  className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-medium text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">
+                  Major / Field
                 </label>
                 <input
                   type="text"
-                  value={formData.fullName}
-                  onChange={handleFieldChange('fullName')}
-                  placeholder="Enter your full name"
-                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  value={formData.courseOfStudy}
+                  onChange={handleFieldChange('courseOfStudy')}
+                  placeholder="e.g., Design"
+                  className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-medium text-slate-900 dark:text-white"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Age
-                  </label>
-                  <input
-                    type="number"
-                    min="10"
-                    max="80"
-                    value={formData.age}
-                    onChange={handleFieldChange('age')}
-                    placeholder="How old are you?"
-                    className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Course of study
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.courseOfStudy}
-                    onChange={handleFieldChange('courseOfStudy')}
-                    placeholder="e.g., Computer Science"
-                    className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  />
-                </div>
-              </div>
             </div>
-          );
+          </div>
+        );
 
       case 'interests':
         return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {interestOptions.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => handleMultiSelect('interests', option.id)}
-                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left ${
-                    formData.interests.includes(option.id)
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-primary/50 text-gray-700 dark:text-gray-300'
+          <div className="grid grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-2 scrollbar-none">
+            {interestOptions.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => handleMultiSelect('interests', option.id)}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all text-center relative overflow-hidden group ${formData.interests.includes(option.id)
+                    ? 'border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400'
+                    : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 hover:border-brand-500/30 text-slate-700 dark:text-slate-300'
                   }`}
-                >
-                  <span className="text-2xl">{option.icon}</span>
-                  <span className="font-medium">{option.label}</span>
-                </button>
-              ))}
-            </div>
+              >
+                <span className="text-3xl group-hover:scale-110 transition-transform">{option.icon}</span>
+                <span className="text-sm font-bold tracking-tight">{option.label}</span>
+                {formData.interests.includes(option.id) && (
+                  <div className="absolute top-2 right-2">
+                    <div className="w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
         );
 
       case 'goals':
         return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {goalOptions.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => handleMultiSelect('goals', option.id)}
-                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left ${
-                    formData.goals.includes(option.id)
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-primary/50 text-gray-700 dark:text-gray-300'
+          <div className="grid grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-2 scrollbar-none">
+            {goalOptions.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => handleMultiSelect('goals', option.id)}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all text-center relative overflow-hidden group ${formData.goals.includes(option.id)
+                    ? 'border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400'
+                    : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 hover:border-brand-500/30 text-slate-700 dark:text-slate-300'
                   }`}
-                >
-                  <span className="text-2xl">{option.icon}</span>
-                  <span className="font-medium">{option.label}</span>
-                </button>
-              ))}
-            </div>
+              >
+                <span className="text-3xl group-hover:scale-110 transition-transform">{option.icon}</span>
+                <span className="text-sm font-bold tracking-tight">{option.label}</span>
+                {formData.goals.includes(option.id) && (
+                  <div className="absolute top-2 right-2">
+                    <div className="w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
         );
 
       case 'background':
         return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Current Education Level
+          <div className="grid gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">
+                Education
               </label>
               <select
                 value={formData.education}
                 onChange={handleFieldChange('education')}
-                className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-medium text-slate-900 dark:text-white appearance-none"
               >
-                <option value="">Select your education level</option>
+                <option value="">Select level...</option>
                 <option value="high-school">High School</option>
                 <option value="undergraduate">Undergraduate</option>
                 <option value="graduate">Graduate</option>
@@ -341,34 +335,32 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
                 <option value="other">Other</option>
               </select>
             </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Location (Country/City)
-                </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={handleFieldChange('location')}
-                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="e.g., Lagos, Nigeria"
-                />
-              </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Experience Level
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">
+                Location
+              </label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={handleFieldChange('location')}
+                placeholder="City, Country"
+                className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-medium text-slate-900 dark:text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">
+                Experience
               </label>
               <select
                 value={formData.experience}
                 onChange={handleFieldChange('experience')}
-                className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-medium text-slate-900 dark:text-white appearance-none"
               >
-                <option value="">Select your experience level</option>
-                <option value="beginner">Beginner (Just starting out)</option>
-                <option value="intermediate">Intermediate (Some experience)</option>
-                <option value="advanced">Advanced (Experienced)</option>
-                <option value="expert">Expert (Highly experienced)</option>
+                <option value="">Select experience...</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+                <option value="expert">Expert</option>
               </select>
             </div>
           </div>
@@ -376,43 +368,52 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
 
       case 'learning':
         return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3">
-              {learningOptions.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => handleMultiSelect('preferredLearning', option.id)}
-                  className={`flex items-start gap-4 p-4 rounded-2xl border transition-all text-left ${
-                    formData.preferredLearning.includes(option.id)
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-primary/50 text-gray-700 dark:text-gray-300'
+          <div className="grid gap-3">
+            {learningOptions.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => handleMultiSelect('preferredLearning', option.id)}
+                className={`flex items-center gap-4 p-4 rounded-2xl border transition-all text-left group ${formData.preferredLearning.includes(option.id)
+                    ? 'border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400'
+                    : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 hover:border-brand-500/30 text-slate-700 dark:text-slate-300'
                   }`}
-                >
-                  <span className="text-2xl">{option.icon}</span>
-                  <div>
-                    <div className="font-medium">{option.label}</div>
-                    <div className="text-sm opacity-75">{option.desc}</div>
+              >
+                <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-2xl transition-all ${formData.preferredLearning.includes(option.id) ? 'bg-brand-500 text-white scale-110' : 'bg-slate-200 dark:bg-slate-800'
+                  }`}>
+                  {option.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-sm">{option.label}</div>
+                  <div className="text-xs opacity-60 truncate">{option.desc}</div>
+                </div>
+                {formData.preferredLearning.includes(option.id) && (
+                  <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center">
+                    <Sparkles size={10} className="text-white" />
                   </div>
-                </button>
-              ))}
-            </div>
+                )}
+              </button>
+            ))}
           </div>
         );
 
       case 'completion':
         return (
-          <div className="text-center py-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-subtle">
-              <Globe size={40} className="text-white" />
+          <div className="text-center py-4 sm:py-6">
+            <div className="relative inline-block mb-8">
+              <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
+              <div className="relative w-24 h-24 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/20 rotate-3">
+                <Globe size={48} className="text-white animate-spin-slow" />
+              </div>
             </div>
-            <p className="text-lg text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-              Perfect! I now have everything I need to provide you with personalized recommendations. 
-              Your dashboard is being prepared with opportunities and roadmaps tailored just for you.
+            <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-3">
+              You're all set!
+            </h3>
+            <p className="text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto leading-relaxed mb-6">
+              I'm now tailoring a discovery board specifically for your {formData.interests.length} focus areas.
             </p>
-            <div className="bg-gradient-to-r from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 p-4 rounded-2xl">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                <strong>Ready to explore:</strong> {formData.interests.length} interest areas, {formData.goals.length} goals, and personalized learning paths
-              </p>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-xs font-bold uppercase tracking-widest">
+              <BookOpen size={14} />
+              Configuring High-Impact Path
             </div>
           </div>
         );
@@ -423,72 +424,86 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-3xl shadow-2xl animate-fade-in ${isDarkMode ? 'dark' : ''}`}>
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+      <div className={`w-full max-w-md bg-white dark:bg-gray-950 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col transition-all duration-500 border border-slate-200 dark:border-white/5 ${isDarkMode ? 'dark' : ''}`}>
+        {/* Header Section */}
+        <div className="relative px-8 pt-8 pb-4">
+          <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white">{steps[currentStep].title}</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{steps[currentStep].subtitle}</p>
-            </div>
-            {/* Remove close button for new users to make it compulsory, keep for existing users */}
-            {currentStep === 0 && initialData === null && (
-              <div className="p-2 rounded-full">
-                <X size={20} className="text-transparent" /> {/* Invisible placeholder for alignment */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2.5 py-1 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 text-[10px] font-bold uppercase tracking-widest border border-brand-500/20">
+                  Step {currentStep + 1}
+                </span>
+                <div className="h-px flex-1 bg-slate-100 dark:bg-white/5" />
               </div>
-            )}
-            {currentStep === 0 && initialData !== null && (
-              <button
-                onClick={() => onComplete(null)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-              >
-                <X size={20} className="text-gray-500" />
-              </button>
-            )}
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="mt-4">
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
-              <span>Step {currentStep + 1} of {steps.length}</span>
-              <span>{Math.round(((currentStep + 1) / steps.length) * 100)}%</span>
+              <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white leading-tight">
+                {steps[currentStep].title}
+              </h2>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
+                {steps[currentStep].subtitle}
+              </p>
             </div>
-            <div className="w-full h-2 overflow-hidden rounded-full bg-neutral-200/70 dark:bg-neutral-700/40 backdrop-blur-sm">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-accent-400 shadow-[0_8px_24px_-14px_rgba(6,182,212,0.85)] transition-[width] duration-500 ease-out"
-                style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6">
-          {renderStepContent()}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between gap-4">
-            <Button
-              variant="secondary"
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="flex items-center gap-2"
+            <button
+              onClick={() => onComplete(null)}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-colors text-slate-400"
             >
-              <ChevronLeft size={16} />
-              Previous
-            </Button>
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Progress Indicator */}
+          <div className="mt-6 flex gap-1.5">
+            {steps.map((_, idx) => (
+              <div
+                key={idx}
+                className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentStep
+                    ? 'w-12 bg-brand-500'
+                    : idx < currentStep
+                      ? 'w-4 bg-emerald-500'
+                      : 'w-4 bg-slate-100 dark:bg-white/5'
+                  }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 px-8 py-4 overflow-y-auto scrollbar-none min-h-[300px]">
+          <div className="animate-fade-in-up">
+            {renderStepContent()}
+          </div>
+        </div>
+
+        {/* Action Footer */}
+        <div className="p-8 pt-4">
+          <div className="flex items-center gap-4">
+            {currentStep > 0 && (
+              <Button
+                variant="secondary"
+                onClick={handlePrevious}
+                className="h-14 px-6 rounded-2xl border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-all flex items-center justify-center shrink-0"
+              >
+                <ChevronLeft size={20} className="text-slate-600 dark:text-slate-400" />
+              </Button>
+            )}
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="flex items-center gap-2"
+              className={`flex-1 h-14 rounded-2xl font-bold text-sm tracking-wide gap-2 shadow-xl transition-all active:scale-95 ${canProceed()
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-brand-500/25 hover:shadow-brand-500/40'
+                  : 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed border-none'
+                }`}
             >
-              {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
-              <ChevronRight size={16} />
+              <span className="flex-1">{currentStep === steps.length - 1 ? 'Unlock My Dashboard' : 'Next Step'}</span>
+              <ChevronRight size={18} className={canProceed() ? 'animate-bounce-right' : ''} />
             </Button>
           </div>
+
+          {currentStep === 0 && (
+            <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-[0.2em] mt-6 animate-pulse">
+              Takes less than 2 minutes
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -496,6 +511,7 @@ const IntroductionPopup: React.FC<IntroductionPopupProps> = ({ isOpen, onComplet
 };
 
 export default IntroductionPopup;
+
 
 
 

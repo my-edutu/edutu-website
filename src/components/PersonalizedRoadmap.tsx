@@ -1,28 +1,43 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { 
-  ArrowLeft, 
-  Target, 
-  Calendar, 
-  CheckCircle2, 
-  Circle, 
-  ChevronDown, 
+import {
+  ArrowLeft,
+  Target,
+  Calendar,
+  CheckCircle2,
+  Circle,
+  ChevronDown,
   ChevronRight,
   Star,
   Clock,
   TrendingUp,
   Bell,
-  Users
+  Users,
+  Heart,
+  Bookmark,
+  Verified,
+  ExternalLink
 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoals } from '../hooks/useGoals';
+import type { CommunityStory } from '../types/community';
+import {
+  recordCommunityStoryAdoption,
+  recordCommunityStoryLike,
+  recordCommunityStorySave
+} from '../services/communityMarketplaceSupabase';
 
+// Reuse the interfaces from community types for roadmap structure
 interface Task {
   id: string;
   title: string;
   completed: boolean;
   priority: 'high' | 'medium' | 'low';
+  description?: string;
+  duration?: string;
+  resourceIds?: string[];
+  outcome?: string;
 }
 
 interface Week {
@@ -37,16 +52,22 @@ interface Month {
   description: string;
   weeks: Week[];
   isExpanded: boolean;
+  duration?: string;
+  milestone?: string;
+  resourceIds?: string[];
+  checkpoint?: string;
 }
 
 interface PersonalizedRoadmapProps {
   onBack: () => void;
   goalId?: string;
+  communityStory?: CommunityStory;
 }
 
-const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({ 
-  onBack, 
-  goalId
+const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
+  onBack,
+  goalId,
+  communityStory
 }) => {
   const { goals, updateGoal } = useGoals();
   const activeGoal = useMemo(
@@ -61,157 +82,103 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
     },
     [goals, goalId]
   );
-  const goalTitle = activeGoal?.title ?? 'Complete Python Course';
-  const [roadmapData, setRoadmapData] = useState<Month[]>([
-    {
-      id: 'month1',
-      title: 'Month 1: Foundation Building',
-      description: 'Establish strong fundamentals and create your learning environment',
-      isExpanded: true,
-      weeks: [
-        {
-          id: 'week1',
-          title: 'Week 1: Getting Started',
-          tasks: [
-            { id: 't1', title: 'Set up Python development environment', completed: true, priority: 'high' },
-            { id: 't2', title: 'Complete Python basics tutorial', completed: true, priority: 'high' },
-            { id: 't3', title: 'Join Python community forums', completed: false, priority: 'medium' },
-            { id: 't4', title: 'Create GitHub account and first repository', completed: false, priority: 'medium' }
-          ]
-        },
-        {
-          id: 'week2',
-          title: 'Week 2: Core Concepts',
-          tasks: [
-            { id: 't5', title: 'Master variables and data types', completed: false, priority: 'high' },
-            { id: 't6', title: 'Practice control structures (if/else, loops)', completed: false, priority: 'high' },
-            { id: 't7', title: 'Build 3 simple calculator programs', completed: false, priority: 'medium' },
-            { id: 't8', title: 'Read "Automate the Boring Stuff" chapters 1-3', completed: false, priority: 'low' }
-          ]
-        },
-        {
-          id: 'week3',
-          title: 'Week 3: Functions & Modules',
-          tasks: [
-            { id: 't9', title: 'Learn function definition and calling', completed: false, priority: 'high' },
-            { id: 't10', title: 'Understand scope and parameters', completed: false, priority: 'high' },
-            { id: 't11', title: 'Explore built-in modules', completed: false, priority: 'medium' },
-            { id: 't12', title: 'Create your first custom module', completed: false, priority: 'medium' }
-          ]
-        },
-        {
-          id: 'week4',
-          title: 'Week 4: Data Structures',
-          tasks: [
-            { id: 't13', title: 'Master lists, tuples, and dictionaries', completed: false, priority: 'high' },
-            { id: 't14', title: 'Practice list comprehensions', completed: false, priority: 'medium' },
-            { id: 't15', title: 'Build a contact book application', completed: false, priority: 'medium' },
-            { id: 't16', title: 'Complete month 1 assessment quiz', completed: false, priority: 'high' }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'month2',
-      title: 'Month 2: Intermediate Skills',
-      description: 'Dive deeper into Python with object-oriented programming and file handling',
-      isExpanded: false,
-      weeks: [
-        {
-          id: 'week5',
-          title: 'Week 5: Object-Oriented Programming',
-          tasks: [
-            { id: 't17', title: 'Learn classes and objects', completed: false, priority: 'high' },
-            { id: 't18', title: 'Understand inheritance and polymorphism', completed: false, priority: 'high' },
-            { id: 't19', title: 'Build a simple game using OOP', completed: false, priority: 'medium' },
-            { id: 't20', title: 'Practice encapsulation concepts', completed: false, priority: 'medium' }
-          ]
-        },
-        {
-          id: 'week6',
-          title: 'Week 6: File Handling & APIs',
-          tasks: [
-            { id: 't21', title: 'Master file reading and writing', completed: false, priority: 'high' },
-            { id: 't22', title: 'Learn JSON data handling', completed: false, priority: 'high' },
-            { id: 't23', title: 'Make your first API request', completed: false, priority: 'medium' },
-            { id: 't24', title: 'Build a weather app using APIs', completed: false, priority: 'low' }
-          ]
-        },
-        {
-          id: 'week7',
-          title: 'Week 7: Error Handling & Testing',
-          tasks: [
-            { id: 't25', title: 'Learn try/except blocks', completed: false, priority: 'high' },
-            { id: 't26', title: 'Understand different exception types', completed: false, priority: 'medium' },
-            { id: 't27', title: 'Write your first unit tests', completed: false, priority: 'medium' },
-            { id: 't28', title: 'Debug existing code projects', completed: false, priority: 'low' }
-          ]
-        },
-        {
-          id: 'week8',
-          title: 'Week 8: Libraries & Frameworks',
-          tasks: [
-            { id: 't29', title: 'Explore popular Python libraries', completed: false, priority: 'high' },
-            { id: 't30', title: 'Learn basic web scraping with BeautifulSoup', completed: false, priority: 'medium' },
-            { id: 't31', title: 'Try data analysis with pandas', completed: false, priority: 'medium' },
-            { id: 't32', title: 'Complete month 2 project', completed: false, priority: 'high' }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'month3',
-      title: 'Month 3: Advanced Applications',
-      description: 'Build real-world projects and prepare for certification',
-      isExpanded: false,
-      weeks: [
-        {
-          id: 'week9',
-          title: 'Week 9: Web Development',
-          tasks: [
-            { id: 't33', title: 'Learn Flask framework basics', completed: false, priority: 'high' },
-            { id: 't34', title: 'Build a simple web application', completed: false, priority: 'high' },
-            { id: 't35', title: 'Understand HTML templates', completed: false, priority: 'medium' },
-            { id: 't36', title: 'Deploy your app to Heroku', completed: false, priority: 'low' }
-          ]
-        },
-        {
-          id: 'week10',
-          title: 'Week 10: Database Integration',
-          tasks: [
-            { id: 't37', title: 'Learn SQLite basics', completed: false, priority: 'high' },
-            { id: 't38', title: 'Connect Python to database', completed: false, priority: 'high' },
-            { id: 't39', title: 'Build CRUD operations', completed: false, priority: 'medium' },
-            { id: 't40', title: 'Create a task management app', completed: false, priority: 'medium' }
-          ]
-        },
-        {
-          id: 'week11',
-          title: 'Week 11: Final Project',
-          tasks: [
-            { id: 't41', title: 'Plan your capstone project', completed: false, priority: 'high' },
-            { id: 't42', title: 'Implement core functionality', completed: false, priority: 'high' },
-            { id: 't43', title: 'Add user interface and styling', completed: false, priority: 'medium' },
-            { id: 't44', title: 'Write project documentation', completed: false, priority: 'medium' }
-          ]
-        },
-        {
-          id: 'week12',
-          title: 'Week 12: Certification & Next Steps',
-          tasks: [
-            { id: 't45', title: 'Complete final assessment', completed: false, priority: 'high' },
-            { id: 't46', title: 'Apply for Python certification', completed: false, priority: 'high' },
-            { id: 't47', title: 'Update LinkedIn and resume', completed: false, priority: 'medium' },
-            { id: 't48', title: 'Plan advanced learning path', completed: false, priority: 'low' }
-          ]
-        }
-      ]
-    }
-  ]);
+
+  // Use community story title if available, otherwise goal title
+  const goalTitle = communityStory?.title || activeGoal?.title || 'Success Roadmap';
+  const [roadmapData, setRoadmapData] = useState<Month[]>([]);
+  const [communityData, setCommunityData] = useState<CommunityStory | null>(communityStory || null);
+  const [likeLoading, setLikeLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [adoptLoading, setAdoptLoading] = useState(false);
   useEffect(() => {
-    if (!activeGoal) {
-      return;
+    // Initialize roadmap data based on community story if provided, otherwise use default
+    if (communityData) {
+      // Convert CommunityRoadmapStage[] to Month[] structure
+      const convertedData: Month[] = communityData.roadmap.map((stage, index) => ({
+        id: stage.id,
+        title: stage.title,
+        description: stage.description || `Stage ${index + 1} of your journey`,
+        duration: stage.duration,
+        milestone: stage.milestone,
+        resourceIds: stage.resourceIds,
+        checkpoint: stage.checkpoint,
+        isExpanded: index === 0, // Expand the first stage by default
+        weeks: [
+          {
+            id: `week-${stage.id}`,
+            title: stage.title,
+            tasks: stage.tasks.map(task => ({
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              duration: task.duration,
+              resourceIds: task.resourceIds,
+              outcome: task.outcome,
+              completed: false, // Initialize as not completed
+              priority: 'medium' as const
+            }))
+          }
+        ]
+      }));
+      setRoadmapData(convertedData);
+    } else if (activeGoal) {
+      // Use default roadmap if no community data provided
+      const defaultRoadmap: Month[] = [
+        {
+          id: 'month1',
+          title: 'Month 1: Foundation Building',
+          description: 'Establish strong fundamentals and create your learning environment',
+          isExpanded: true,
+          weeks: [
+            {
+              id: 'week1',
+              title: 'Week 1: Getting Started',
+              tasks: [
+                { id: 't1', title: 'Set up development environment', completed: true, priority: 'high' },
+                { id: 't2', title: 'Complete basics tutorial', completed: true, priority: 'high' },
+                { id: 't3', title: 'Join relevant community forums', completed: false, priority: 'medium' },
+                { id: 't4', title: 'Create project repository', completed: false, priority: 'medium' }
+              ]
+            },
+            {
+              id: 'week2',
+              title: 'Week 2: Core Concepts',
+              tasks: [
+                { id: 't5', title: 'Master core concepts', completed: false, priority: 'high' },
+                { id: 't6', title: 'Practice control structures', completed: false, priority: 'high' },
+                { id: 't7', title: 'Build simple applications', completed: false, priority: 'medium' },
+                { id: 't8', title: 'Read relevant resources', completed: false, priority: 'low' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'month2',
+          title: 'Month 2: Intermediate Skills',
+          description: 'Dive deeper with more advanced concepts',
+          isExpanded: false,
+          weeks: [
+            {
+              id: 'week5',
+              title: 'Week 5: Applying Knowledge',
+              tasks: [
+                { id: 't17', title: 'Build more complex projects', completed: false, priority: 'high' },
+                { id: 't18', title: 'Implement best practices', completed: false, priority: 'high' },
+                { id: 't19', title: 'Get feedback from community', completed: false, priority: 'medium' },
+                { id: 't20', title: 'Refine your work', completed: false, priority: 'medium' }
+              ]
+            }
+          ]
+        }
+      ];
+      setRoadmapData(defaultRoadmap);
     }
+  }, [communityData, activeGoal]);
+
+  // Update progress when roadmap changes or when community data is present
+  useEffect(() => {
+    if (!activeGoal || !communityData) return;
+
     setRoadmapData((prev) => {
       const allTasks = prev.flatMap((month) =>
         month.weeks.flatMap((week) => week.tasks)
@@ -241,7 +208,7 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
         }))
       }));
     });
-  }, [activeGoal?.id, activeGoal?.progress]);
+  }, [activeGoal?.id, activeGoal?.progress, communityData]);
 
   const allTasks = useMemo(
     () => roadmapData.flatMap((month) => month.weeks.flatMap((week) => week.tasks)),
@@ -317,6 +284,35 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
         });
       }
 
+      // Track task completion if this is a community story
+      if (communityData) {
+        import('../services/taskTrackingService').then(module => {
+          const task = next
+            .flatMap(month => month.weeks)
+            .flatMap(week => week.tasks)
+            .find(t => t.id === taskId);
+
+          if (task) {
+            const isNowCompleted = !task.completed; // Since we just toggled it
+            if (isNowCompleted) {
+              module.taskTrackingService.addCompletedTask({
+                id: `community-task-${taskId}`,
+                title: task.title,
+                source: 'community-roadmap',
+                metadata: {
+                  communityStoryId: communityData.id,
+                  communityStoryTitle: communityData.title,
+                  monthId,
+                  weekId
+                }
+              });
+            } else {
+              module.taskTrackingService.removeCompletedTask(`community-task-${taskId}`);
+            }
+          }
+        });
+      }
+
       return next;
     });
   };
@@ -327,6 +323,72 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
       case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
       case 'low': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
+    }
+  };
+
+  const handleLike = async () => {
+    if (!communityData || likeLoading) return;
+    setLikeLoading(true);
+    try {
+      await recordCommunityStoryLike(communityData.id);
+      // Update local state to reflect the like
+      setCommunityData(prev =>
+        prev ? {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            likes: prev.stats.likes + 1
+          }
+        } : null
+      );
+    } catch (error) {
+      console.error('Error recording like:', error);
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!communityData || saveLoading) return;
+    setSaveLoading(true);
+    try {
+      await recordCommunityStorySave(communityData.id);
+      // Update local state to reflect the save
+      setCommunityData(prev =>
+        prev ? {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            saves: prev.stats.saves + 1
+          }
+        } : null
+      );
+    } catch (error) {
+      console.error('Error recording save:', error);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleAdopt = async () => {
+    if (!communityData || adoptLoading) return;
+    setAdoptLoading(true);
+    try {
+      await recordCommunityStoryAdoption(communityData.id);
+      // Update local state to reflect the adoption
+      setCommunityData(prev =>
+        prev ? {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            adoptionCount: prev.stats.adoptionCount + 1
+          }
+        } : null
+      );
+    } catch (error) {
+      console.error('Error recording adoption:', error);
+    } finally {
+      setAdoptLoading(false);
     }
   };
 
@@ -386,10 +448,42 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
               <ArrowLeft size={20} />
             </Button>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">Your Success Roadmap 🎯</h1>
+              <h1 className="text-xl font-bold text-gray-800 dark:text-white">
+                {communityData ? 'Community Roadmap' : 'Your Success Roadmap'} 🎯
+              </h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">{goalTitle}</p>
             </div>
           </div>
+
+          {/* Community Creator Card - Only show if it's a community roadmap */}
+          {communityData && (
+            <div className="mb-4 p-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold">
+                    {communityData.creator.avatar?.charAt(0) || communityData.creator.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <h3 className="font-medium text-gray-900 dark:text-white">{communityData.creator.name}</h3>
+                      {communityData.creator.verified && (
+                        <Verified size={14} className="text-blue-500" />
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{communityData.creator.title}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-yellow-500">
+                    <Star size={14} fill="currentColor" />
+                    <span className="text-xs font-medium">{communityData.rating.toFixed(1)}</span>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{communityData.users} learners</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Progress Bar */}
           <div className="mb-4">
@@ -428,6 +522,36 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
               <div className="text-xs text-gray-600 dark:text-gray-400">Priority: {priorityLabel}</div>
             </div>
           </div>
+
+          {/* Community Stats and Engagement - Only show if it's a community roadmap */}
+          {communityData && (
+            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-center">
+                <div className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                  {communityData.rating.toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Rating</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                  {communityData.users}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Learners</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                  {communityData.successRate}%
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Success</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                  {communityData.stats.adoptionCount}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Adoption</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -499,13 +623,13 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
                         {week.tasks.map((task, taskIndex) => (
                           <div
                             key={task.id}
-                            className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer hover:bg-white dark:hover:bg-gray-600 ${
+                            className={`flex items-start gap-3 p-3 rounded-xl transition-all cursor-pointer hover:bg-white dark:hover:bg-gray-600 ${
                               task.completed ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500'
                             } animate-slide-up`}
                             style={{ animationDelay: `${taskIndex * 50}ms` }}
                             onClick={() => toggleTask(month.id, week.id, task.id)}
                           >
-                            <button className="flex-shrink-0">
+                            <button className="flex-shrink-0 mt-0.5">
                               {task.completed ? (
                                 <CheckCircle2 size={20} className="text-green-600" />
                               ) : (
@@ -516,6 +640,21 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
                               <p className={`text-sm ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-white'}`}>
                                 {task.title}
                               </p>
+                              {task.description && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{task.description}</p>
+                              )}
+                              {task.duration && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Clock size={12} className="text-gray-400" />
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">{task.duration}</span>
+                                </div>
+                              )}
+                              {task.outcome && (
+                                <div className="mt-1">
+                                  <span className="text-xs font-medium text-green-600 dark:text-green-400">Outcome: </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">{task.outcome}</span>
+                                </div>
+                              )}
                             </div>
                             <div className={`px-2 py-1 rounded-full text-xs border ${getPriorityColor(task.priority)}`}>
                               {task.priority}
@@ -530,7 +669,10 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
                           <div className="flex items-center gap-2 text-accent">
                             <Star size={16} />
                             <p className="text-sm font-medium">
-                              {motivationalQuotes[weekIndex % motivationalQuotes.length]}
+                              {communityData
+                                ? "Great job completing this stage! Your next step awaits."
+                                : motivationalQuotes[weekIndex % motivationalQuotes.length]
+                              }
                             </p>
                           </div>
                         </div>
@@ -549,7 +691,10 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
             <div className="text-4xl mb-3">🎉</div>
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Congratulations!</h3>
             <p className="text-gray-600 dark:text-gray-300 mb-4">
-              You've completed your Python learning journey! Time to celebrate and plan your next adventure.
+              {communityData
+                ? `You've completed the "${communityData.title}" roadmap! Great job following this path shared by ${communityData.creator.name}.`
+                : "You've completed your learning journey! Time to celebrate and plan your next adventure."
+              }
             </p>
             <Button className="inline-flex items-center gap-2">
               <TrendingUp size={16} />
@@ -559,22 +704,65 @@ const PersonalizedRoadmap: React.FC<PersonalizedRoadmapProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 pt-4">
-          <Button 
-            variant="secondary" 
-            className="flex items-center justify-center gap-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            onClick={handleSetReminders}
-          >
-            <Bell size={16} />
-            Set Reminders
-          </Button>
-          <Button 
-            className="flex items-center justify-center gap-2"
-            onClick={handleJoinCommunity}
-          >
-            <Users size={16} />
-            Join Community
-          </Button>
+        <div className="pt-4">
+          {communityData ? (
+            // Community roadmap specific buttons
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Button
+                variant="secondary"
+                className="flex items-center justify-center gap-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                onClick={handleLike}
+                disabled={likeLoading}
+              >
+                <Heart size={16} className={communityData.stats.likes > 0 ? "text-red-500 fill-current" : ""} />
+                {likeLoading ? 'Liking...' : 'Like'}
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex items-center justify-center gap-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                onClick={handleSave}
+                disabled={saveLoading}
+              >
+                <Bookmark size={16} className={communityData.stats.saves > 0 ? "text-blue-500 fill-current" : ""} />
+                {saveLoading ? 'Saving...' : 'Save'}
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex items-center justify-center gap-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                onClick={handleAdopt}
+                disabled={adoptLoading}
+              >
+                <Target size={16} />
+                {adoptLoading ? 'Adopting...' : 'Adopt'}
+              </Button>
+              <Button
+                className="flex items-center justify-center gap-2"
+                onClick={handleJoinCommunity}
+              >
+                <Users size={16} />
+                Join Community
+              </Button>
+            </div>
+          ) : (
+            // Personal roadmap buttons
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                variant="secondary"
+                className="flex items-center justify-center gap-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                onClick={handleSetReminders}
+              >
+                <Bell size={16} />
+                Set Reminders
+              </Button>
+              <Button
+                className="flex items-center justify-center gap-2"
+                onClick={handleJoinCommunity}
+              >
+                <Users size={16} />
+                Join Community
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

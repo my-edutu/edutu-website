@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { conversation, user } = req.body;
+  const { conversation, user, message, threadId } = req.body;
 
   // Validate the API key is set
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -35,9 +35,11 @@ export default async function handler(req, res) {
     }
   }
 
-  const requestBody = {
-    model: 'z-ai/glm-4.6',
-    messages: [
+  // Determine which format is being used
+  let messages;
+  if (conversation) {
+    // Original format with conversation array
+    messages = [
       { role: 'system', content: systemPromptLines.join(' ') },
       ...conversation
         .filter((message) => !message.isTyping && message.content.trim().length > 0)
@@ -45,7 +47,22 @@ export default async function handler(req, res) {
           role: message.type === 'user' ? 'user' : 'assistant',
           content: message.content
         }))
-    ]
+    ];
+  } else if (message) {
+    // New format with single message and threadId
+    // If we have a threadId, we could potentially load previous messages from storage
+    // For now, just use the system message and the current user message
+    messages = [
+      { role: 'system', content: systemPromptLines.join(' ') },
+      { role: 'user', content: message }
+    ];
+  } else {
+    return res.status(400).json({ error: 'Either conversation or message must be provided' });
+  }
+
+  const requestBody = {
+    model: 'z-ai/glm-4.6',
+    messages: messages
   };
 
   try {
