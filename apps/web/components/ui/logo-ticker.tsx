@@ -27,32 +27,30 @@ export function LogoTicker() {
   const secondLine = duplicatedLogos.slice(Math.floor(duplicatedLogos.length / 2));
 
   return (
-    <div className="w-full overflow-hidden py-12 bg-white dark:bg-zinc-950 border-t border-b border-zinc-100 dark:border-zinc-800">
+    <div className="w-full overflow-hidden py-12 bg-slate-50 border-t border-b border-slate-200">
       <div className="text-center mb-8">
-        <p className="text-lg font-medium text-zinc-700 dark:text-zinc-300">
+        <p className="text-lg font-medium text-slate-700">
           Get opportunities from leading institutions worldwide
         </p>
       </div>
       
       <div className="flex flex-col gap-6">
-        {/* First line - moves right */}
         <div className="flex gap-12 items-center animate-[scroll-left_30s_linear_infinite]">
           {firstLine.map((logo, i) => (
             <span 
               key={`first-${i}`} 
-              className="text-lg font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              className="text-lg font-medium text-slate-500 whitespace-nowrap hover:text-slate-800 transition-colors"
             >
               {logo.text}
             </span>
           ))}
         </div>
         
-        {/* Second line - moves left */}
         <div className="flex gap-12 items-center animate-[scroll-right_30s_linear_infinite]">
           {secondLine.map((logo, i) => (
             <span 
               key={`second-${i}`} 
-              className="text-lg font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              className="text-lg font-medium text-slate-500 whitespace-nowrap hover:text-slate-800 transition-colors"
             >
               {logo.text}
             </span>

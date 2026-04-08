@@ -13,15 +13,15 @@ export function Header() {
 	const links = [
 		{
 			label: 'Features',
-			href: '#',
+			href: '#features',
 		},
 		{
-			label: 'Pricing',
-			href: '#',
+			label: 'How It Works',
+			href: '#how-it-works',
 		},
 		{
-			label: 'About',
-			href: '#',
+			label: 'Testimonials',
+			href: '#testimonials',
 		},
 	];
 
@@ -39,28 +39,39 @@ export function Header() {
 	return (
 		<header
 			className={cn('sticky top-0 z-50 w-full border-b border-transparent', {
-				'bg-background/95 supports-[backdrop-filter]:bg-background/50 border-border backdrop-blur-lg':
+				'bg-slate-900/95 supports-[backdrop-filter]:bg-slate-900/50 border-white/20 backdrop-blur-lg':
 					scrolled,
 			})}
 		>
 			<nav className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
-				<div className="hover:bg-accent rounded-md p-2">
-					<WordmarkIcon className="h-4" />
+				<div className="hover:bg-white/10 rounded-md p-2 transition-colors">
+					<WordmarkIcon className="h-5 text-white" />
 				</div>
 				<div className="hidden items-center gap-2 md:flex">
 					{links.map((link) => (
-						<a key={link.label} className={buttonVariants({ variant: 'ghost' })} href={link.href}>
+						<a 
+							key={link.label} 
+							className={buttonVariants({ variant: 'ghost' })} 
+							href={link.href}
+						>
 							{link.label}
 						</a>
 					))}
-					<Button variant="outline">Sign In</Button>
-					<Button>Get Started</Button>
+					<Button 
+						variant="outline" 
+						className="border-white/30 text-white hover:bg-white/20 hover:text-white"
+					>
+						Sign In
+					</Button>
+					<Button className="bg-orange-600 hover:bg-orange-700 text-white">
+						Get Started
+					</Button>
 				</div>
 				<Button
 					size="icon"
 					variant="outline"
 					onClick={() => setOpen(!open)}
-					className="md:hidden"
+					className="md:hidden border-white/30 text-white hover:bg-white/20"
 					aria-expanded={open}
 					aria-controls="mobile-menu"
 					aria-label="Toggle menu"
@@ -87,7 +98,7 @@ export function Header() {
 					<Button variant="outline" className="w-full bg-transparent">
 						Sign In
 					</Button>
-					<Button className="w-full">Get Started</Button>
+					<Button className="w-full bg-orange-600 hover:bg-orange-700">Get Started</Button>
 				</div>
 			</MobileMenu>
 		</header>
@@ -105,8 +116,8 @@ function MobileMenu({ open, children, className, ...props }: MobileMenuProps) {
 		<div
 			id="mobile-menu"
 			className={cn(
-				'bg-background/95 supports-[backdrop-filter]:bg-background/50 backdrop-blur-lg',
-				'fixed top-14 right-0 bottom-0 left-0 z-40 flex flex-col overflow-hidden border-y md:hidden',
+				'bg-slate-900/95 supports-[backdrop-filter]:bg-slate-900/50 backdrop-blur-lg',
+				'fixed top-14 right-0 bottom-0 left-0 z-40 flex flex-col overflow-hidden border-y border-white/20 md:hidden',
 			)}
 		>
 			<div
