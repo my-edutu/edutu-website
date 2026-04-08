@@ -1,13 +1,4 @@
-*
+apps/
 !apps/web
-apps/web/*
-!apps/web/app
-!apps/web/components
-!apps/web/lib
-!apps/web/public
-!apps/web/package.json
-!apps/web/next.config.mjs
-!apps/web/tsconfig.json
-!apps/web/postcss.config.mjs
-!apps/web/vercel.json
-!apps/web/.gitignore
+!apps/web/*
+!apps/web/.*
