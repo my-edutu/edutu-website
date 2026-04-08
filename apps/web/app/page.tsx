@@ -8,6 +8,11 @@ import { CountryFlags } from "@/components/ui/country-flags"
 import { LogoTicker } from "@/components/ui/logo-ticker"
 import { ProblemSection } from "@/components/ui/problem-section"
 import BentoGrid from "@/components/ui/bento-grid"
+import { HowItWorks } from "@/components/ui/how-it-works"
+import TestimonialsSection from "@/components/ui/testimonials-section"
+import BlogSection from "@/components/ui/blog-section"
+import { CtaCard } from "@/components/ui/cta-card"
+import Footer from "@/components/ui/footer"
 
 export default function Home() {
   const texts = [
@@ -69,7 +74,9 @@ export default function Home() {
               </p>
             </div>
 
+            <div id="waitlist-form">
             <WaitlistForm />
+          </div>
 
             <div className="pt-8 text-sm text-white/80 drop-shadow-lg font-body">
               <p>Don&#39;t Worry. We don&#39;t Spam </p>
@@ -88,6 +95,33 @@ export default function Home() {
 
         {/* Bento Grid Section */}
         <BentoGrid />
+
+        {/* How It Works Section */}
+        <HowItWorks />
+
+        {/* Testimonials Section */}
+        <TestimonialsSection />
+
+        {/* Blog Section */}
+        <BlogSection />
+
+        {/* CTA Section */}
+        <section className="py-20 px-4">
+          <div className="max-w-4xl mx-auto">
+            <CtaCard
+              title="Ready to Get Started?"
+              subtitle="Start Your Journey Today"
+              description="Join thousands of students who have found their dream opportunities through Edutu. Create your free profile and let our AI match you with scholarships, fellowships, and more."
+              buttonText="Join the Waitlist"
+              imageSrc="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=600&auto=format&fit=crop&q=60"
+              imageAlt="Students celebrating graduation"
+              onButtonClick={() => document.getElementById('waitlist-form')?.scrollIntoView({ behavior: 'smooth' })}
+            />
+          </div>
+        </section>
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   )
