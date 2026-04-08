@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react"
 import { WaitlistForm } from "@/components/waitlist-form"
 import { MeshGradient } from "@paper-design/shaders-react"
+import { Header } from "@/components/ui/header-1"
+import { CountryFlags } from "@/components/ui/country-flags"
+import { LogoTicker } from "@/components/ui/logo-ticker"
+import { ProblemSection } from "@/components/ui/problem-section"
 
 export default function Home() {
   const texts = [
@@ -19,13 +23,11 @@ export default function Home() {
     let timeoutId: NodeJS.Timeout
 
     if (isTyping) {
-      // Typing effect
       if (displayedText.length < currentText.length) {
         timeoutId = setTimeout(() => {
           setDisplayedText(currentText.slice(0, displayedText.length + 1))
-        }, 50) // Typing speed
+        }, 50)
       } else {
-        // Finished typing, wait 4 seconds then clear and move to next text
         timeoutId = setTimeout(() => {
           setDisplayedText("")
           setCurrentTextIndex((prev) => (prev + 1) % texts.length)
@@ -53,10 +55,9 @@ export default function Home() {
       </div>
 
       <div className="relative z-10">
-        {/* Main content */}
+        <Header />
         <main className="flex items-center justify-center min-h-screen p-4 my-0">
           <div className="w-full max-w-2xl mx-auto text-center space-y-8">
-            {/* Hero section */}
             <div className="text-4xl md:text-6xl font-bold tracking-tight text-white drop-shadow-2xl font-sans">
               <h1 className="text-4xl md:text-6xl tracking-tight text-white drop-shadow-2xl py-6 font-semibold min-h-[120px] md:min-h-[144px] flex items-center justify-center">
                 {displayedText}
@@ -67,15 +68,22 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Waitlist form */}
             <WaitlistForm />
 
-            {/* Footer */}
             <div className="pt-8 text-sm text-white/80 drop-shadow-lg font-body">
               <p>Don&#39;t Worry. We don&#39;t Spam </p>
             </div>
           </div>
         </main>
+
+        {/* Country Flags Section */}
+        <CountryFlags />
+
+        {/* Logo Ticker Section */}
+        <LogoTicker />
+
+        {/* Problem Section */}
+        <ProblemSection />
       </div>
     </div>
   )
