@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { WaitlistForm } from "@/components/waitlist-form"
-import { MeshGradient } from "@paper-design/shaders-react"
 import { Header } from "@/components/ui/header-1"
 import { CountryFlags } from "@/components/ui/country-flags"
 import { LogoTicker } from "@/components/ui/logo-ticker"
@@ -20,19 +19,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative">
-      {/* Hero Animated Background - ONLY for hero section */}
-      <div className="absolute inset-0 z-0 h-screen overflow-hidden">
-        <MeshGradient
-          className="h-full w-full"
-          distortion={0.8}
-          swirl={0.1}
-          offsetX={0}
-          offsetY={0}
-          scale={1}
-          rotation={0}
-          speed={1}
-          colors={["hsl(216, 90%, 27%)", "hsl(243, 68%, 36%)", "hsl(205, 91%, 64%)", "hsl(211, 61%, 57%)"]}
-        />
+      {/* Hero Animated Background */}
+      <div className="absolute inset-0 z-0 h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 overflow-hidden">
+        {/* Animated gradient orbs */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-slate-600/20 rounded-full blur-3xl animate-pulse delay-500" />
       </div>
 
       {/* Main Content */}
