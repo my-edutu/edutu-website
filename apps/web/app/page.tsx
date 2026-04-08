@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { WaitlistForm } from "@/components/waitlist-form"
 import { MeshGradient } from "@paper-design/shaders-react"
 import { Header } from "@/components/ui/header-1"
@@ -19,11 +19,11 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false)
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-slate-900">
-      {/* Hero Animated Background */}
-      <div className="fixed inset-0 z-0">
+    <div className="min-h-screen relative">
+      {/* Hero Animated Background - ONLY for hero section */}
+      <div className="absolute inset-0 z-0 h-screen overflow-hidden">
         <MeshGradient
-          className="h-screen w-screen"
+          className="h-full w-full"
           distortion={0.8}
           swirl={0.1}
           offsetX={0}
@@ -35,15 +35,16 @@ export default function Home() {
         />
       </div>
 
+      {/* Main Content */}
       <div className="relative z-10">
         <Header />
-        <main className="flex items-center justify-center min-h-screen p-4 my-0">
+        <main className="flex items-center justify-center min-h-screen p-4">
           <div className="w-full max-w-2xl mx-auto text-center space-y-8">
-            <div className="text-4xl md:text-6xl font-bold tracking-tight text-white drop-shadow-2xl font-sans">
+            <div className="text-4xl md:text-6xl font-bold tracking-tight text-white drop-shadow-2xl">
               <h1 className="text-4xl md:text-6xl tracking-tight text-white drop-shadow-2xl py-6 font-semibold min-h-[120px] md:min-h-[144px] flex items-center justify-center">
                 Find Scholarships & Global Opportunities That Match You
               </h1>
-              <p className="max-w-lg drop-shadow-xl font-body h-auto text-center text-white leading-6 mx-auto px-0 py-0 font-normal text-lg tracking-[0.01em]">
+              <p className="max-w-lg drop-shadow-xl h-auto text-center text-white leading-relaxed mx-auto font-normal text-lg">
                 No endless searching. Get opportunities tailored to your profile.
               </p>
             </div>
@@ -52,7 +53,7 @@ export default function Home() {
               <Button 
                 size="lg" 
                 onClick={() => setShowForm(true)}
-                className="bg-orange-600 hover:bg-orange-700 text-white text-lg px-8 py-6"
+                className="bg-orange-600 hover:bg-orange-700 text-white text-lg px-8 py-6 shadow-lg"
               >
                 Join Waitlist
               </Button>
@@ -68,50 +69,40 @@ export default function Home() {
               </div>
             )}
 
-            <div className="pt-8 text-sm text-white/80 drop-shadow-lg font-body">
-              <p>Don&#39;t Worry. We don&#39;t Spam </p>
+            <div className="pt-8 text-sm text-white/80 drop-shadow-lg">
+              <p>Don&apos;t Worry. We don&apos;t Spam</p>
             </div>
           </div>
         </main>
 
-        {/* Country Flags Section */}
-        <CountryFlags />
+        {/* Rest of sections with white/light background */}
+        <div className="bg-white">
+          <CountryFlags />
+          <LogoTicker />
+          <ProblemSection />
+          <BentoGrid />
+          <HowItWorks />
+          <TestimonialsSection />
+          <BlogSection />
 
-        {/* Logo Ticker Section */}
-        <LogoTicker />
+          {/* CTA Section */}
+          <section className="py-20 px-4">
+            <div className="max-w-4xl mx-auto">
+              <CtaCard
+                title="Ready to Get Started?"
+                subtitle="Start Your Journey Today"
+                description="Join thousands of students who have found their dream opportunities through Edutu. Create your free profile and let our AI match you with scholarships, fellowships, and more."
+                buttonText="Join the Waitlist"
+                imageSrc="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=600&auto=format&fit=crop&q=60"
+                imageAlt="Students celebrating graduation"
+                onButtonClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              />
+            </div>
+          </section>
 
-        {/* Problem Section */}
-        <ProblemSection />
-
-        {/* Bento Grid Section */}
-        <BentoGrid />
-
-        {/* How It Works Section */}
-        <HowItWorks />
-
-        {/* Testimonials Section */}
-        <TestimonialsSection />
-
-        {/* Blog Section */}
-        <BlogSection />
-
-        {/* CTA Section */}
-        <section className="py-20 px-4">
-          <div className="max-w-4xl mx-auto">
-            <CtaCard
-              title="Ready to Get Started?"
-              subtitle="Start Your Journey Today"
-              description="Join thousands of students who have found their dream opportunities through Edutu. Create your free profile and let our AI match you with scholarships, fellowships, and more."
-              buttonText="Join the Waitlist"
-              imageSrc="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=600&auto=format&fit=crop&q=60"
-              imageAlt="Students celebrating graduation"
-              onButtonClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            />
-          </div>
-        </section>
-
-        {/* Footer */}
-        <Footer />
+          {/* Footer */}
+          <Footer />
+        </div>
       </div>
     </div>
   )
