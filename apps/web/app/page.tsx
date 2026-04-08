@@ -7,6 +7,7 @@ import { Header } from "@/components/ui/header-1"
 import { CountryFlags } from "@/components/ui/country-flags"
 import { LogoTicker } from "@/components/ui/logo-ticker"
 import { ProblemSection } from "@/components/ui/problem-section"
+import BentoGrid from "@/components/ui/bento-grid"
 
 export default function Home() {
   const texts = [
@@ -84,6 +85,9 @@ export default function Home() {
 
         {/* Problem Section */}
         <ProblemSection />
+
+        {/* Bento Grid Section */}
+        <BentoGrid />
       </div>
     </div>
   )
