@@ -2,3 +2,7 @@ apps/
 !apps/web
 !apps/web/*
 !apps/web/.*
+package.json
+package-lock.json
+*.json
+!apps/web/package.json
