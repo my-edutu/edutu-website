@@ -1,0 +1,16 @@
+{
+    "name": "@edutu/core",
+    "version": "0.0.0",
+    "private": true,
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "scripts": {
+        "dev": "tsc --watch"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.45.1"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}
